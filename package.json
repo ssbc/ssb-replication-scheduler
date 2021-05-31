@@ -1,0 +1,19 @@
+{
+  "name": "ssb-new-replication-stuff",
+  "version": "1.0.0",
+  "description": "Replication manager",
+  "homepage": "https://github.com/ssb-ngi-pointer/ssb-new-replication-stuff",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ssb-ngi-pointer/ssb-new-replication-stuff.git"
+  },
+  "dependencies": {
+    
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andre Staltz <contact@staltz.com>",
+  "license": "LGPL-3.0"
+}
