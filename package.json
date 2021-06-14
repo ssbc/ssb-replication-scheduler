@@ -1,14 +1,11 @@
 {
-  "name": "ssb-new-replication-stuff",
-  "version": "1.0.0",
-  "description": "Replication manager",
-  "homepage": "https://github.com/ssb-ngi-pointer/ssb-new-replication-stuff",
+  "name": "ssb-replication-scheduler",
+  "version": "0.1.0",
+  "description": "A secret-stack plugin to orchestrate replication using EBT",
+  "homepage": "https://github.com/ssb-ngi-pointer/ssb-replication-scheduler",
   "repository": {
     "type": "git",
-    "url": "git://github.com/ssb-ngi-pointer/ssb-new-replication-stuff.git"
-  },
-  "dependencies": {
-    
+    "url": "git://github.com/ssb-ngi-pointer/ssb-replication-scheduler.git"
   },
   "main": "index.js",
   "scripts": {
