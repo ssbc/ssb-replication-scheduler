@@ -76,11 +76,8 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
         return {
           request(id, bool) {
             if (id !== sbot.id) {
-              // t.equals(id, bobId, 'request id matches bob')
-              // t.false(bool, 'request flag is false')
               t.true(expectedRequest.length > 0, 'expected')
               const [expectedDest, expectedBool] = expectedRequest.shift()
-              // t.equals(orig, sbot.id, 'self feed id')
               t.equals(id, expectedDest, 'request feed id matches')
               t.equals(bool, expectedBool, 'bool matches')
             }
