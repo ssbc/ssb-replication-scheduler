@@ -31,7 +31,8 @@
     "tape": "^5.2.2"
   },
   "scripts": {
-    "test": "tape 'test/@(unit|integration)/*.js' | tap-spec"
+    "test": "tape 'test/@(unit|integration)/*.js' | tap-spec",
+    "coverage": "nyc npm run test"
   },
   "author": "Andre Staltz <contact@staltz.com>",
   "license": "LGPL-3.0"
