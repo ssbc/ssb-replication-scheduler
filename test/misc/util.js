@@ -32,3 +32,15 @@ exports.readOnceFromDB = function (sbot) {
     }, false)
   })
 }
+
+exports.randint = function (max) {
+  return ~~(Math.random() * max)
+}
+
+exports.randary = function (ary) {
+  return ary[exports.randint(ary.length)]
+}
+
+exports.randbytes = function (size) {
+  return crypto.randomBytes(size)
+}
