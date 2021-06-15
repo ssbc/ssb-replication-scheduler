@@ -8,6 +8,9 @@ exports.init = function (ssb, config) {
   if (!ssb.ebt) {
     throw new Error('ssb-replication-scheduler expects ssb-ebt to be installed')
   }
+  if (!ssb.friends) {
+    throw new Error('ssb-replication-scheduler expects ssb-friends to be installed')
+  }
 
   // Replicate myself
   ssb.ebt.request(ssb.id, true)
