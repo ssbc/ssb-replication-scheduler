@@ -8,6 +8,22 @@
     "url": "git://github.com/ssb-ngi-pointer/ssb-replication-scheduler.git"
   },
   "main": "index.js",
+  "dependencies": {
+    "pull-stream": "^3.6.14"
+  },
+  "devDependencies": {
+    "nyc": "^15.1.0",
+    "promisify-4loc": "^1.0.0",
+    "promisify-tuple": "^1.2.0",
+    "scuttle-testbot": "^1.5.2",
+    "ssb-caps": "^1.1.0",
+    "ssb-db": "^20.4.0",
+    "ssb-ebt": "6.0.0",
+    "ssb-friends": "ssbc/ssb-friends#unbermuda",
+    "ssb-keys": "^8.1.0",
+    "tap-spec": "^5.0.0",
+    "tape": "^5.2.2"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
