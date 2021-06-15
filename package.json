@@ -25,7 +25,7 @@
     "tape": "^5.2.2"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tape 'test/@(unit|integration)/*.js' | tap-spec"
   },
   "author": "Andre Staltz <contact@staltz.com>",
   "license": "LGPL-3.0"
