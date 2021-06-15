@@ -1,6 +1,6 @@
 {
   "name": "ssb-replication-scheduler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A secret-stack plugin to orchestrate replication using EBT",
   "homepage": "https://github.com/ssb-ngi-pointer/ssb-replication-scheduler",
   "repository": {
