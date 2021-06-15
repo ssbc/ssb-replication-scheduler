@@ -1,18 +1,20 @@
+const pull = require('pull-stream')
+
 exports.name = 'replicationScheduler'
 exports.version = '1.0.0'
 exports.manifest = {}
 
-exports.init = function (sbot, config) {
-  if (!sbot.ebt) {
+exports.init = function (ssb, config) {
+  if (!ssb.ebt) {
     throw new Error('ssb-replication-scheduler expects ssb-ebt to be installed')
   }
 
   // Replicate myself
-  ssb.ebt.request(sbot.id, true)
+  ssb.ebt.request(ssb.id, true)
 
   // For each edge in the social graph, call either `request` or `block`
   pull(
-    sbot.friends.stream(),
+    ssb.friends.stream(),
     pull.filter((contacts) => !!contacts),
     pull.map((contacts) => {
       // Individual edge updates
@@ -32,8 +34,8 @@ exports.init = function (sbot, config) {
     }),
     pull.flatten(),
     pull.drain(({from, to, value}) => {
-      if (from === sbot.id) ssb.ebt.request(to, value !== false)
-      if (to !== sbot.id) ssb.ebt.block(from, to, value === false)
+      if (from === ssb.id) ssb.ebt.request(to, value !== false)
+      if (to !== ssb.id) ssb.ebt.block(from, to, value === false)
     }),
   )
 
