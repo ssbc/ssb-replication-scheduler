@@ -18,11 +18,9 @@ const createSsbServer = SecretStack({
   .use(require('../..'))
 
 const CONNECTION_TIMEOUT = 500 // ms
-const REPLICATION_TIMEOUT = 2 * CONNECTION_TIMEOUT
+const REPLICATION_TIMEOUT = 4 * CONNECTION_TIMEOUT
 
 tape('replicate between 3 peers, using ssb-db2', async (t) => {
-  t.plan(3)
-
   rimraf.sync(path.join(os.tmpdir(), 'server-alice'))
   rimraf.sync(path.join(os.tmpdir(), 'server-bob'))
   rimraf.sync(path.join(os.tmpdir(), 'server-carol'))
@@ -42,6 +40,7 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
     keys: ssbKeys.generate(),
     timeout: CONNECTION_TIMEOUT,
   })
+  t.pass('started the 3 peers')
 
   // Wait for all bots to be ready
   await sleep(500)
@@ -64,12 +63,22 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
     pify(carol.db.publish)({ type: 'contact', contact: alice.id, following: true }),
     pify(carol.db.publish)({ type: 'contact', contact: bob.id, following: true }),
   ])
+  t.pass('published all the messages')
+
+  // This is unfortunately needed, otherwise *sometimes* we get errors such
+  // [NotFoundError]: Key not found in database [["<FEEDID>",1]]
+  await Promise.all([
+    pify(alice.db.onDrain)('ebt'),
+    pify(bob.db.onDrain)('ebt'),
+    pify(carol.db.onDrain)('ebt'),
+  ])
 
   const [connectionBA, connectionBC, connectionCA] = await Promise.all([
     pify(bob.connect)(alice.getAddress()),
     pify(bob.connect)(carol.getAddress()),
     pify(carol.connect)(alice.getAddress()),
   ])
+  t.pass('peers are connected to each other')
 
   const expectedClock = {
     [alice.id]: 3,
@@ -78,12 +87,14 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
   }
 
   await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
 
   const [clockAlice, clockBob, clockCarol] = await Promise.all([
     pify(alice.getVectorClock)(),
     pify(bob.getVectorClock)(),
     pify(carol.getVectorClock)(),
   ])
+  t.pass('getVectorClocks')
 
   t.deepEqual(clockAlice, expectedClock, 'alice\'s clock is correct')
   t.deepEqual(clockBob, expectedClock, 'bob\'s clock is correct')
