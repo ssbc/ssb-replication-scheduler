@@ -66,7 +66,7 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
   const [connectionBA, connectionBC, connectionCA] = await Promise.all([
     pify(bob.connect)(alice.getAddress()),
     pify(bob.connect)(carol.getAddress()),
-    pify(carol.connect)(alice.getAddress()),
+    // pify(carol.connect)(alice.getAddress()),
   ])
   t.pass('peers are connected to each other')
 
