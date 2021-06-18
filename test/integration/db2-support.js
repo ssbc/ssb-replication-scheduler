@@ -1,16 +1,14 @@
 const tape = require('tape')
-const crypto = require('crypto')
 const ssbKeys = require('ssb-keys')
 const path = require('path')
 const os = require('os')
 const rimraf = require('rimraf')
+const caps = require('ssb-caps')
 const SecretStack = require('secret-stack')
 const pify = require('promisify-4loc')
 const sleep = require('util').promisify(setTimeout)
 
-const createSsbServer = SecretStack({
-  caps: { shs: crypto.randomBytes(32).toString('base64') }
-})
+const createSsbServer = SecretStack({ caps })
   .use(require('ssb-db2'))
   .use(require('ssb-db2/compat/ebt'))
   .use(require('ssb-ebt'))
