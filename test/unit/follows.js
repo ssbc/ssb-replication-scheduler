@@ -12,8 +12,8 @@ tape('listen to friends stream and replicates initial follows', (t) => {
       name: 'friends',
       init(sbot) {
         return {
-          stream() {
-            return pull.values([{from: sbot.id, to: bobId, value: true}])
+          graphStream() {
+            return pull.values([{source: sbot.id, dest: bobId, value: 1}])
           },
         }
       },
@@ -54,11 +54,11 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
       name: 'friends',
       init(sbot) {
         return {
-          stream() {
+          graphStream() {
             return pull.values([
               {
                 [sbot.id]: {
-                  [bobId]: true,
+                  [bobId]: 1,
                 },
               },
             ])

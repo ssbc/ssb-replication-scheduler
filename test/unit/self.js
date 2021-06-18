@@ -10,7 +10,7 @@ tape('replicates myself', (t) => {
       name: 'friends',
       init(sbot) {
         return {
-          stream() {
+          graphStream() {
             return pull.empty();
           },
         }

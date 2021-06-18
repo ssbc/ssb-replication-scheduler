@@ -130,7 +130,7 @@ tape('carol does not replicate alice\'s data with bob', async (t) => {
 })
 
 tape('alice does not replicate messages from bob, but carol does', async (t) => {
-  t.plan(8)
+  t.plan(10)
 
   await Promise.all([
     pify(alice.publish)(u.follow(carol.id)),
@@ -151,8 +151,10 @@ tape('alice does not replicate messages from bob, but carol does', async (t) => 
     t.equal(msg.value.author, carol.id, 'alice gets a msg from carol')
   }, false)
 
-  const g = await pify(carol.friends.get)()
-  t.ok(g[carol.id][bob.id])
+  const carolsGraph = await pify(carol.friends.graph)()
+  t.equals(carolsGraph[carol.id][alice.id], 1, 'carol follows alice')
+  t.equals(carolsGraph[carol.id][bob.id], 1, 'carol follows bob')
+  t.equals(carolsGraph[alice.id][bob.id], -1, 'carol knows that alice blocks bob')
 
   const [rpcCarolToAlice, rpcCarolToBob] = await Promise.all([
     pify(carol.connect)(alice.getAddress()),

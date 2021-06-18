@@ -17,28 +17,28 @@ exports.init = function (ssb, config) {
 
   // For each edge in the social graph, call either `request` or `block`
   pull(
-    ssb.friends.stream(),
-    pull.filter((contacts) => !!contacts),
-    pull.map((contacts) => {
+    ssb.friends.graphStream({live: true, old: true}),
+    pull.map((data) => {
+      // console.log(ssb.id, data)
       // Individual edge updates
-      if (contacts.from && contacts.to) {
-        return pull.values([contacts])
+      if (data.source && data.dest) {
+        return pull.values([data])
       }
       // Initial data containing all edges
       else {
         const arr = []
-        for (const from of Object.keys(contacts)) {
-          for (const to of Object.keys(contacts[from])) {
-            arr.push({from, to, value: contacts[from][to]})
+        for (const source of Object.keys(data)) {
+          for (const dest of Object.keys(data[source])) {
+            arr.push({source, dest, value: data[source][dest]})
           }
         }
         return pull.values(arr)
       }
     }),
     pull.flatten(),
-    pull.drain(({from, to, value}) => {
-      if (from === ssb.id) ssb.ebt.request(to, value !== false)
-      if (to !== ssb.id) ssb.ebt.block(from, to, value === false)
+    pull.drain(({source, dest, value}) => {
+      if (source === ssb.id) ssb.ebt.request(dest, value !== -1)
+      if (dest !== ssb.id) ssb.ebt.block(source, dest, value === -1)
     }),
   )
 
