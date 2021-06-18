@@ -63,10 +63,12 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
   ])
   t.pass('published all the messages')
 
+  await sleep(500)
+
   const [connectionBA, connectionBC, connectionCA] = await Promise.all([
     pify(bob.connect)(alice.getAddress()),
     pify(bob.connect)(carol.getAddress()),
-    // pify(carol.connect)(alice.getAddress()),
+    pify(carol.connect)(alice.getAddress()),
   ])
   t.pass('peers are connected to each other')
 
@@ -183,6 +185,8 @@ tape('replicate between 3 peers, using ssb-db2, restarting', async (t) => {
     timeout: CONNECTION_TIMEOUT,
   })
   t.pass('restarted the 3 peers')
+
+  await sleep(500)
 
   const [connectionBA, connectionBC, connectionCA] = await Promise.all([
     pify(bob.connect)(alice.getAddress()),
