@@ -11,7 +11,10 @@ tape('replicates myself', (t) => {
       init(sbot) {
         return {
           graphStream() {
-            return pull.empty();
+            return pull.empty()
+          },
+          hopStream() {
+            return pull.empty()
           },
         }
       },

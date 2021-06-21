@@ -16,6 +16,9 @@ tape('listen to friends stream and ebt.blocks initial blocked peers', (t) => {
           graphStream() {
             return pull.values([{source: sbot.id, dest: bobId, value: -1}])
           },
+          hopStream() {
+            return pull.empty()
+          }
         }
       },
     })
@@ -49,7 +52,7 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
   t.plan(15)
   const bobId = ssbKeys.generate().id
 
-  const expectedRequest = [[bobId, false], [bobId, true]]
+  const expectedRequest = [[bobId, false], [bobId, false]]
   const expectedBlock = [[bobId, true], [bobId, false]]
 
   Server
@@ -67,6 +70,9 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
               },
             ])
           },
+          hopStream() {
+            return pull.empty()
+          }
         }
       },
     })
@@ -89,7 +95,7 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
             t.equals(dest, expectedDest, 'blocked feed id matches')
             t.equals(bool, expectedBool, 'bool matches')
 
-            if (expectedBlock.length === 0) {
+            if (expectedBlock.length === 0 && expectedRequest.length === 0) {
               sbot.close(err => {
                 t.error(err, 'close sbot')
                 t.end()

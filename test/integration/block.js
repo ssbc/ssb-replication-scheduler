@@ -29,18 +29,27 @@ const alice = createSsbServer({
   temp: 'test-block-alice',
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('alice'),
+  friends: {
+    hops: 1
+  }
 })
 
 const bob = createSsbServer({
   temp: 'test-block-bob',
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('bob'),
+  friends: {
+    hops: 1
+  }
 })
 
 const carol = createSsbServer({
   temp: 'test-block-carol',
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('carol'),
+  friends: {
+    hops: 1
+  }
 })
 
 tape('alice blocks bob, and bob cannot connect to alice', async (t) => {

@@ -15,6 +15,9 @@ tape('listen to friends stream and replicates initial follows', (t) => {
           graphStream() {
             return pull.values([{source: sbot.id, dest: bobId, value: 1}])
           },
+          hopStream() {
+            return pull.empty()
+          }
         }
       },
     })
@@ -63,6 +66,9 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
               },
             ])
           },
+          hopStream() {
+            return pull.empty()
+          }
         }
       },
     })

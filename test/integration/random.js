@@ -88,6 +88,9 @@ const alice = createSsbServer({
   temp: 'ebt_test-random-animals',
   timeout: CONNECTION_TIMEOUT,
   keys: ssbKeys.generate(),
+  friends: {
+    hops: 1
+  }
 })
 
 let liveMsgCount = 0
@@ -174,6 +177,9 @@ tape('replicate social network for animals', async (t) => {
     temp: 'ebt_test-random-animals2',
     timeout: CONNECTION_TIMEOUT,
     keys: ssbKeys.generate(),
+    friends: {
+      hops: 1
+    }
   })
 
   if (!bob.friends) {
