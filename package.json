@@ -1,15 +1,20 @@
 {
   "name": "ssb-replication-scheduler",
-  "version": "0.3.0",
   "description": "A secret-stack plugin to orchestrate replication using EBT",
+  "version": "0.3.0",
+  "author": "Andre Staltz <contact@staltz.com>",
+  "license": "LGPL-3.0",
   "homepage": "https://github.com/ssb-ngi-pointer/ssb-replication-scheduler",
   "repository": {
     "type": "git",
     "url": "git://github.com/ssb-ngi-pointer/ssb-replication-scheduler.git"
   },
   "main": "index.js",
+  "engines": {
+    "node": ">=10"
+  },
   "dependencies": {
-    "pull-stream": "^3.6.14"
+    "pull-stream": "^3.6.0"
   },
   "devDependencies": {
     "cat-names": "^3.0.0",
@@ -34,7 +39,5 @@
   "scripts": {
     "test": "tape 'test/@(unit|integration)/*.js' | tap-spec",
     "coverage": "nyc npm run test"
-  },
-  "author": "Andre Staltz <contact@staltz.com>",
-  "license": "LGPL-3.0"
+  }
 }
