@@ -23,7 +23,7 @@ const ALICE_DIR = '/tmp/ssb-replication-scheduler-fixtures-alice'
 const BOB_DIR = '/tmp/ssb-replication-scheduler-fixtures-bob'
 
 const CONNECTION_TIMEOUT = 500 // ms
-const REPLICATION_TIMEOUT = 4 * CONNECTION_TIMEOUT
+const REPLICATION_TIMEOUT = 6 * CONNECTION_TIMEOUT
 
 test('generate fixture with flumelog-offset', async (t) => {
   rimraf.sync(ALICE_DIR, { maxBusyTries: 3 })
@@ -58,14 +58,14 @@ test('tests large-scale EBT replication', async (t) => {
     path: ALICE_DIR,
     timeout: CONNECTION_TIMEOUT,
     keys: aliceKeys,
-    friends: { hops: 999 },
+    friends: { hops: 2 },
   })
 
   const bob = createSbot({
     path: BOB_DIR,
     timeout: CONNECTION_TIMEOUT,
     keys: bobKeys,
-    friends: { hops: 999 },
+    friends: { hops: 2 },
   })
 
   t.ok(alice.getAddress(), 'alice has an address')
