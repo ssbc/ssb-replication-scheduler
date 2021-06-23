@@ -14,7 +14,13 @@ tape('listen to friends stream and ebt.blocks initial blocked peers', (t) => {
       init(sbot) {
         return {
           graphStream() {
-            return pull.values([{source: sbot.id, dest: bobId, value: -1}])
+            return pull.values([
+              {
+                [sbot.id]: {
+                  [bobId]: -1
+                }
+              }
+            ])
           },
           hopStream() {
             return pull.empty()
@@ -62,7 +68,11 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
         return {
           graphStream() {
             return pull.values([
-              {source: sbot.id, dest: bobId, value: -1},
+              {
+                [sbot.id]: {
+                  [bobId]: -1
+                }
+              },
               {
                 [sbot.id]: {
                   [bobId]: -2,

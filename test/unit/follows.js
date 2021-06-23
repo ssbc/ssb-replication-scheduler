@@ -13,7 +13,13 @@ tape('listen to friends stream and replicates initial follows', (t) => {
       init(sbot) {
         return {
           graphStream() {
-            return pull.values([{source: sbot.id, dest: bobId, value: 1}])
+            return pull.values([
+              {
+                [sbot.id]: {
+                  [bobId]: 1
+                }
+              }
+            ])
           },
           hopStream() {
             return pull.empty()

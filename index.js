@@ -23,29 +23,20 @@ exports.init = function (ssb, config) {
   // For each edge in the social graph, call either `request` or `block`
   pull(
     ssb.friends.graphStream({old: true, live: true}),
-    pull.map((data) => {
-      const arr = []
-      // Individual edge updates
-      if (data.source && data.dest) {
-        arr.push(data)
-      }
-      // Initial data containing all edges
-      else {
-        for (const source of Object.keys(data)) {
-          for (const dest of Object.keys(data[source])) {
-            arr.push({source, dest, value: data[source][dest]})
+    pull.drain((graph) => {
+      for (const source of Object.keys(graph)) {
+        for (const dest of Object.keys(graph[source])) {
+          const value = graph[source][dest]
+          // Only if I am the `source` and `value >= 0`, request replication
+          if (source === ssb.id) {
+            ssb.ebt.request(dest, value >= 0)
+          }
+          // Compute every block edge, unless I am the edge destination
+          if (dest !== ssb.id) {
+            ssb.ebt.block(source, dest, value === -1)
           }
         }
       }
-      return pull.values(arr)
-    }),
-    pull.flatten(),
-    pull.drain(({source, dest, value}) => {
-      // Only if I am the `source` and `value >= 0`, request replication
-      if (source === ssb.id) ssb.ebt.request(dest, value >= 0)
-
-      // Compute every block edge, regardless of source, except if dest is me
-      if (dest !== ssb.id) ssb.ebt.block(source, dest, value === -1)
     }),
   )
 
