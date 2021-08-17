@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
-const RequestManager = require('./request-manager')
+const RequestManager = require('./req-manager')
 
 exports.name = 'replicationScheduler'
 exports.version = '1.0.0'
