@@ -51,7 +51,7 @@ module.exports = class RequestManager {
     pull(
       pull.values([...this._requestables]),
       pull.asyncMap((feedId, cb) => {
-        if (!this._opts.partially) return cb(null, false)
+        if (!this._opts.partially) return cb(null, [feedId, false])
 
         this._supportsPartialReplication(feedId, (err, partially) => {
           if (err) cb(err)
