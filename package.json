@@ -10,6 +10,9 @@
     "url": "git://github.com/ssb-ngi-pointer/ssb-replication-scheduler.git"
   },
   "main": "index.js",
+  "files": [
+    "*.js"
+  ],
   "engines": {
     "node": ">=10"
   },
