@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
+const RequestManager = require('./request-manager')
 
 exports.name = 'replicationScheduler'
 exports.version = '1.0.0'
@@ -23,7 +24,9 @@ exports.init = function (ssb, config) {
   // true in most cases. These three blocks below may sometimes overlap, but
   // that's okay, as long as we cover *all* cases.
 
-  // Replicate myself
+  const requestManager = new RequestManager(ssb)
+
+  // Replicate myself ASAP, without request manager
   ssb.ebt.request(ssb.id, true)
 
   // For each edge in the social graph, call either `request` or `block`
@@ -35,7 +38,8 @@ exports.init = function (ssb, config) {
           const value = graph[source][dest]
           // Only if I am the `source` and `value >= 0`, request replication
           if (source === ssb.id) {
-            ssb.ebt.request(dest, value >= 0)
+            if (value >= 0) requestManager.add(dest)
+            else ssb.ebt.request(dest, false)
           }
           // Compute every block edge, unless I am the edge destination
           if (dest !== ssb.id) {
@@ -54,7 +58,7 @@ exports.init = function (ssb, config) {
         const value = hops[dest]
         // myself or friendly peers
         if (value >= 0) {
-          ssb.ebt.request(dest, true)
+          requestManager.add(dest)
           ssb.ebt.block(ssb.id, dest, false)
         }
         // blocked peers
