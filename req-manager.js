@@ -1,8 +1,13 @@
 const pull = require('pull-stream')
 
+const DEFAULT_OPTS = {
+  partially: false,
+}
+
 module.exports = class RequestManager {
-  constructor(ssb) {
+  constructor(ssb, config) {
     this._ssb = ssb
+    this._opts = config.replicationScheduler || DEFAULT_OPTS
     this._requestables = new Set()
     this._requestedFully = new Set()
     this._requestedPartially = new Set()
@@ -15,6 +20,10 @@ module.exports = class RequestManager {
     this._flush()
   }
 
+  reconfigure(opts) {
+    this._opts = { ...this._opts, opts }
+  }
+
   _requestFully(feedId) {
     this._requestables.delete(feedId)
     this._requestedFully.add(feedId)
@@ -24,7 +33,7 @@ module.exports = class RequestManager {
   _requestPartially(feedId) {
     this._requestables.delete(feedId)
     this._requestedPartially.add(feedId)
-    // FIXME: implement
+    // FIXME: implement. Go through this._opts.partially to detect subfeeds
   }
 
   _supportsPartialReplication(feedId, cb) {
@@ -42,6 +51,8 @@ module.exports = class RequestManager {
     pull(
       pull.values([...this._requestables]),
       pull.asyncMap((feedId, cb) => {
+        if (!this._opts.partially) return cb(null, false)
+
         this._supportsPartialReplication(feedId, (err, partially) => {
           if (err) cb(err)
           else cb(null, [feedId, partially])

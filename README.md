@@ -6,7 +6,7 @@ SPDX-License-Identifier: CC0-1.0
 
 # ssb-replication-scheduler
 
-*Triggers replication of feeds identified as friendly in the social graph.*
+_Triggers replication of feeds identified as friendly in the social graph._
 
 Depends on ssb-friends APIs, and calls ssb-ebt APIs.
 
@@ -41,10 +41,10 @@ Add this secret-stack plugin like this:
 
 ## Usage
 
-There are no APIs, and nothing else you need to do. As soon as the SSB peer is
-initialized, `ssb-replication-scheduler` will automatically query the social
-graph, and either request replication or stop replication, depending whether the
-feed is friendly or blocked.
+Typically there is nothing you need to do after installing this plugin. As soon
+as the SSB peer is initialized, `ssb-replication-scheduler` will automatically
+query the social graph, and either request replication or stop replication,
+depending whether the feed is friendly or blocked.
 
 **Opinions embedded in the scheduler:**
 
@@ -57,6 +57,53 @@ feed is friendly or blocked.
     - And so forth
 - Replication is strictly disabled for:
   - Any feed you explicitly block
+
+### Configuration
+
+Some parameters and opinions can be configured by the user or by application
+code through the conventional [ssb-config](https://github.com/ssbc/ssb-config)
+object. The possible options are listed below:
+
+````js
+{
+  replicationScheduler: {
+    /**
+     * If `partially` is an array, it tells the replication scheduler to perform
+     * partial replication, whenever remote feeds support it. The array
+     * describes the tree of meta feeds that we are interested in replicating.
+     * If `partially` is `false (which it is, by default), then all friendly
+     * feeds will be requested in full.
+     *
+     * Example:
+     *
+     * ```js
+     * partially: [
+     *   {
+     *     feedpurpose: 'indexes',
+     *     children: [
+     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'post' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'vote' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'about' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'contact' } } }
+     *     ]
+     *   },
+     *   { feedpurpose: 'coolgame' },
+     *   { feedpurpose: 'git-ssb' },
+     * ]
+     * ```
+     */
+    partially: false,
+  }
+}
+````
+
+### muxrpc APIs
+
+#### `ssb.replicationScheduler.reconfigure(config) => void`
+
+At any point during the execution of your program, you can reconfigure the
+replication rules using this API. The configuration object passed to this API
+has the same shape as `config.replicationScheduler` (see above) has.
 
 ## License
 

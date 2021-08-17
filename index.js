@@ -7,7 +7,9 @@ const RequestManager = require('./req-manager')
 
 exports.name = 'replicationScheduler'
 exports.version = '1.0.0'
-exports.manifest = {}
+exports.manifest = {
+  reconfigure: 'sync',
+}
 
 exports.init = function (ssb, config) {
   if (!ssb.ebt) {
@@ -24,7 +26,7 @@ exports.init = function (ssb, config) {
   // true in most cases. These three blocks below may sometimes overlap, but
   // that's okay, as long as we cover *all* cases.
 
-  const requestManager = new RequestManager(ssb)
+  const requestManager = new RequestManager(ssb, config)
 
   // Replicate myself ASAP, without request manager
   ssb.ebt.request(ssb.id, true)
@@ -74,5 +76,9 @@ exports.init = function (ssb, config) {
     })
   )
 
-  return {}
+  return {
+    reconfigure(opts) {
+      requestManager.reconfigure(opts)
+    },
+  }
 }
