@@ -15,7 +15,7 @@ const u = require('../misc/util')
 // 3. carol will not give bob any, she will not give him any data from alice.
 
 const createSsbServer = SecretStack({
-  caps: { shs: crypto.randomBytes(32).toString('base64') }
+  caps: { shs: crypto.randomBytes(32).toString('base64') },
 })
   .use(require('ssb-db'))
   .use(require('ssb-ebt'))
@@ -43,39 +43,46 @@ const carol = createSsbServer({
   keys: ssbKeys.generate(),
 })
 
-tape('alice blocks bob while he is connected, she should disconnect him', async (t) => {
-  t.plan(3)
+tape(
+  'alice blocks bob while he is connected, she should disconnect him',
+  async (t) => {
+    t.plan(3)
 
-  // in the beginning alice and bob follow each other
-  await Promise.all([
-    pify(alice.publish)(u.follow(bob.id)),
-    pify(bob.publish)(u.follow(alice.id)),
-    pify(carol.publish)(u.follow(alice.id))
-  ])
+    // in the beginning alice and bob follow each other
+    await Promise.all([
+      pify(alice.publish)(u.follow(bob.id)),
+      pify(bob.publish)(u.follow(alice.id)),
+      pify(carol.publish)(u.follow(alice.id)),
+    ])
 
-  await Promise.all([
-    pify(bob.connect)(carol.getAddress()),
-    pify(carol.connect)(alice.getAddress()),
-  ])
+    await Promise.all([
+      pify(bob.connect)(carol.getAddress()),
+      pify(carol.connect)(alice.getAddress()),
+    ])
 
-  const msgAtBob = await u.readOnceFromDB(bob)
+    const msgAtBob = await u.readOnceFromDB(bob)
 
-  // should be the alice's follow(bob) message.
-  t.equal(msgAtBob.value.author, alice.id)
-  t.equal(msgAtBob.value.content.contact, bob.id)
+    // should be the alice's follow(bob) message.
+    t.equal(msgAtBob.value.author, alice.id)
+    t.equal(msgAtBob.value.content.contact, bob.id)
 
-  await pify(alice.publish)(u.block(bob.id))
+    await pify(alice.publish)(u.block(bob.id))
 
-  await sleep(REPLICATION_TIMEOUT)
+    await sleep(REPLICATION_TIMEOUT)
 
-  const clockBob = await pify(bob.getVectorClock)()
-  t.equals(clockBob[alice.id], 1, 'bob does not receive the message where alice blocked him')
+    const clockBob = await pify(bob.getVectorClock)()
+    t.equals(
+      clockBob[alice.id],
+      1,
+      'bob does not receive the message where alice blocked him'
+    )
 
-  await Promise.all([
-    pify(alice.close)(true),
-    pify(bob.close)(true),
-    pify(carol.close)(true),
-  ])
+    await Promise.all([
+      pify(alice.close)(true),
+      pify(bob.close)(true),
+      pify(carol.close)(true),
+    ])
 
-  t.end()
-})
+    t.end()
+  }
+)

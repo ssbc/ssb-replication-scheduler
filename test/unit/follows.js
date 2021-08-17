@@ -7,26 +7,25 @@ tape('listen to friends stream and replicates initial follows', (t) => {
   t.plan(6)
   const bobId = ssbKeys.generate().id
 
-  Server
-    .use({
-      name: 'friends',
-      init(sbot) {
-        return {
-          graphStream() {
-            return pull.values([
-              {
-                [sbot.id]: {
-                  [bobId]: 1
-                }
-              }
-            ])
-          },
-          hopStream() {
-            return pull.empty()
-          }
-        }
-      },
-    })
+  Server.use({
+    name: 'friends',
+    init(sbot) {
+      return {
+        graphStream() {
+          return pull.values([
+            {
+              [sbot.id]: {
+                [bobId]: 1,
+              },
+            },
+          ])
+        },
+        hopStream() {
+          return pull.empty()
+        },
+      }
+    },
+  })
     .use({
       name: 'ebt',
       init(sbot) {
@@ -58,26 +57,25 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
   t.plan(6)
   const bobId = ssbKeys.generate().id
 
-  Server
-    .use({
-      name: 'friends',
-      init(sbot) {
-        return {
-          graphStream() {
-            return pull.values([
-              {
-                [sbot.id]: {
-                  [bobId]: 1,
-                },
+  Server.use({
+    name: 'friends',
+    init(sbot) {
+      return {
+        graphStream() {
+          return pull.values([
+            {
+              [sbot.id]: {
+                [bobId]: 1,
               },
-            ])
-          },
-          hopStream() {
-            return pull.empty()
-          }
-        }
-      },
-    })
+            },
+          ])
+        },
+        hopStream() {
+          return pull.empty()
+        },
+      }
+    },
+  })
     .use({
       name: 'ebt',
       init(sbot) {

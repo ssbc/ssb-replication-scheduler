@@ -8,19 +8,25 @@ exports.keysFor = function (name) {
 
 exports.follow = function (id) {
   return {
-    type: 'contact', contact: id, following: true
+    type: 'contact',
+    contact: id,
+    following: true,
   }
 }
 
 exports.unfollow = function (id) {
   return {
-    type: 'contact', contact: id, following: false
+    type: 'contact',
+    contact: id,
+    following: false,
   }
 }
 
-exports.block = function unfollow (id) {
+exports.block = function unfollow(id) {
   return {
-    type: 'contact', contact: id, flagged: true
+    type: 'contact',
+    contact: id,
+    flagged: true,
   }
 }
 

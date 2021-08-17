@@ -7,7 +7,7 @@ const sleep = require('util').promisify(setTimeout)
 const u = require('../misc/util')
 
 const createSsbServer = SecretStack({
-  caps: { shs: crypto.randomBytes(32).toString('base64') }
+  caps: { shs: crypto.randomBytes(32).toString('base64') },
 })
   .use(require('ssb-db'))
   .use(require('ssb-ebt'))
@@ -30,8 +30,8 @@ const alice = createSsbServer({
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('alice'),
   friends: {
-    hops: 1
-  }
+    hops: 1,
+  },
 })
 
 const bob = createSsbServer({
@@ -39,8 +39,8 @@ const bob = createSsbServer({
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('bob'),
   friends: {
-    hops: 1
-  }
+    hops: 1,
+  },
 })
 
 const carol = createSsbServer({
@@ -48,8 +48,8 @@ const carol = createSsbServer({
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('carol'),
   friends: {
-    hops: 1
-  }
+    hops: 1,
+  },
 })
 
 tape('alice blocks bob, and bob cannot connect to alice', async (t) => {
@@ -60,7 +60,7 @@ tape('alice blocks bob, and bob cannot connect to alice', async (t) => {
   await Promise.all([
     pify(alice.publish)(u.follow(bob.id)),
     pify(bob.publish)(u.follow(alice.id)),
-    pify(carol.publish)(u.follow(alice.id))
+    pify(carol.publish)(u.follow(alice.id)),
   ])
 
   const [rpcBobToAlice, msgAtBob, msgAtAlice] = await Promise.all([
@@ -75,11 +75,19 @@ tape('alice blocks bob, and bob cannot connect to alice', async (t) => {
 
   // should be the alice's follow(bob) message.
   t.equal(msgAtBob.value.author, alice.id, 'bob received message from alice')
-  t.equal(msgAtBob.value.content.contact, bob.id, 'received message is about bob')
+  t.equal(
+    msgAtBob.value.content.contact,
+    bob.id,
+    'received message is about bob'
+  )
 
   // should be the bob's follow(alice) message.
   t.equal(msgAtAlice.value.author, bob.id, 'alice received message from bob')
-  t.equal(msgAtAlice.value.content.contact, alice.id, 'received message is about alice')
+  t.equal(
+    msgAtAlice.value.content.contact,
+    alice.id,
+    'received message is about alice'
+  )
 
   // disconnect bob from alice
   await pify(rpcBobToAlice.close)(true)
@@ -117,7 +125,7 @@ tape('alice blocks bob, and bob cannot connect to alice', async (t) => {
   t.end()
 })
 
-tape('carol does not replicate alice\'s data with bob', async (t) => {
+tape("carol does not replicate alice's data with bob", async (t) => {
   t.plan(3)
   // first, carol should have already replicated with alice.
   // emits this event when did not allow bob to get this data.
@@ -138,64 +146,71 @@ tape('carol does not replicate alice\'s data with bob', async (t) => {
   t.end()
 })
 
-tape('alice does not replicate messages from bob, but carol does', async (t) => {
-  t.plan(10)
+tape(
+  'alice does not replicate messages from bob, but carol does',
+  async (t) => {
+    t.plan(10)
 
-  await Promise.all([
-    pify(alice.publish)(u.follow(carol.id)),
-    pify(bob.publish)({ type: 'post', text: 'hello' }),
-    pify(carol.publish)(u.follow(bob.id))
-  ])
+    await Promise.all([
+      pify(alice.publish)(u.follow(carol.id)),
+      pify(bob.publish)({ type: 'post', text: 'hello' }),
+      pify(carol.publish)(u.follow(bob.id)),
+    ])
 
-  const recv = { alice: 0, carol: 0 }
+    const recv = { alice: 0, carol: 0 }
 
-  // carol will receive: alice's recent follow and all of bob's (two) msgs
-  // because carol is now following bob
-  carol.post((msg) => recv.carol++, false)
+    // carol will receive: alice's recent follow and all of bob's (two) msgs
+    // because carol is now following bob
+    carol.post((msg) => recv.carol++, false)
 
-  // alice will receive: all of carol's (two) msgs
-  // because alice is now following carol
-  alice.post((msg) => {
-    recv.alice++
-    t.equal(msg.value.author, carol.id, 'alice gets a msg from carol')
-  }, false)
+    // alice will receive: all of carol's (two) msgs
+    // because alice is now following carol
+    alice.post((msg) => {
+      recv.alice++
+      t.equal(msg.value.author, carol.id, 'alice gets a msg from carol')
+    }, false)
 
-  const carolsGraph = await pify(carol.friends.graph)()
-  t.equals(carolsGraph[carol.id][alice.id], 1, 'carol follows alice')
-  t.equals(carolsGraph[carol.id][bob.id], 1, 'carol follows bob')
-  t.equals(carolsGraph[alice.id][bob.id], -1, 'carol knows that alice blocks bob')
-
-  const [rpcCarolToAlice, rpcCarolToBob] = await Promise.all([
-    pify(carol.connect)(alice.getAddress()),
-    pify(carol.connect)(bob.getAddress()),
-  ])
-
-  await sleep(REPLICATION_TIMEOUT)
-
-  await pify(rpcCarolToAlice.close)(true)
-  await pify(rpcCarolToBob.close)(true)
-
-  // Drain Carol's full log
-  await new Promise((resolve, reject) => {
-    pull(
-      carol.createLogStream(),
-      pull.collect(function (err, ary) {
-        if (err) reject(err)
-        else resolve(ary)
-      }),
+    const carolsGraph = await pify(carol.friends.graph)()
+    t.equals(carolsGraph[carol.id][alice.id], 1, 'carol follows alice')
+    t.equals(carolsGraph[carol.id][bob.id], 1, 'carol follows bob')
+    t.equals(
+      carolsGraph[alice.id][bob.id],
+      -1,
+      'carol knows that alice blocks bob'
     )
-  })
 
-  const vclock = await pify(carol.getVectorClock)()
-  t.equals(vclock[alice.id], 3)
-  t.equals(vclock[bob.id], 2)
-  t.equals(vclock[carol.id], 2)
+    const [rpcCarolToAlice, rpcCarolToBob] = await Promise.all([
+      pify(carol.connect)(alice.getAddress()),
+      pify(carol.connect)(bob.getAddress()),
+    ])
 
-  t.equals(recv.carol, 3)
-  t.equals(recv.alice, 2)
+    await sleep(REPLICATION_TIMEOUT)
 
-  t.end()
-})
+    await pify(rpcCarolToAlice.close)(true)
+    await pify(rpcCarolToBob.close)(true)
+
+    // Drain Carol's full log
+    await new Promise((resolve, reject) => {
+      pull(
+        carol.createLogStream(),
+        pull.collect(function (err, ary) {
+          if (err) reject(err)
+          else resolve(ary)
+        })
+      )
+    })
+
+    const vclock = await pify(carol.getVectorClock)()
+    t.equals(vclock[alice.id], 3)
+    t.equals(vclock[bob.id], 2)
+    t.equals(vclock[carol.id], 2)
+
+    t.equals(recv.carol, 3)
+    t.equals(recv.alice, 2)
+
+    t.end()
+  }
+)
 
 // TODO test that bob is disconnected from alice if he is connected
 //      and she blocks him.

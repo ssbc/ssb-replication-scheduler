@@ -9,7 +9,9 @@ exports.init = function (ssb, config) {
     throw new Error('ssb-replication-scheduler expects ssb-ebt to be installed')
   }
   if (!ssb.friends) {
-    throw new Error('ssb-replication-scheduler expects ssb-friends to be installed')
+    throw new Error(
+      'ssb-replication-scheduler expects ssb-friends to be installed'
+    )
   }
 
   // Note: ssb.ebt.request and ssb.ebt.block are idempotent operations,
@@ -22,7 +24,7 @@ exports.init = function (ssb, config) {
 
   // For each edge in the social graph, call either `request` or `block`
   pull(
-    ssb.friends.graphStream({old: true, live: true}),
+    ssb.friends.graphStream({ old: true, live: true }),
     pull.drain((graph) => {
       for (const source of Object.keys(graph)) {
         for (const dest of Object.keys(graph[source])) {
@@ -37,12 +39,12 @@ exports.init = function (ssb, config) {
           }
         }
       }
-    }),
+    })
   )
 
   // request/block nodes at a reachable distance (within hops config) from me
   pull(
-    ssb.friends.hopStream({old: true, live: true}),
+    ssb.friends.hopStream({ old: true, live: true }),
     pull.drain((hops) => {
       for (const dest of Object.keys(hops)) {
         const value = hops[dest]
@@ -61,7 +63,7 @@ exports.init = function (ssb, config) {
           ssb.ebt.request(dest, false)
         }
       }
-    }),
+    })
   )
 
   return {}

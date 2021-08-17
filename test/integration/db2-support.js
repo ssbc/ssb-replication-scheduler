@@ -50,16 +50,40 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
     pify(carol.db.publish)({ type: 'post', text: 'hello' }),
 
     // alice follows bob & carol
-    pify(alice.db.publish)({ type: 'contact', contact: bob.id, following: true }),
-    pify(alice.db.publish)({ type: 'contact', contact: carol.id, following: true }),
+    pify(alice.db.publish)({
+      type: 'contact',
+      contact: bob.id,
+      following: true,
+    }),
+    pify(alice.db.publish)({
+      type: 'contact',
+      contact: carol.id,
+      following: true,
+    }),
 
     // bob follows alice & carol
-    pify(bob.db.publish)({ type: 'contact', contact: alice.id, following: true }),
-    pify(bob.db.publish)({ type: 'contact', contact: carol.id, following: true }),
+    pify(bob.db.publish)({
+      type: 'contact',
+      contact: alice.id,
+      following: true,
+    }),
+    pify(bob.db.publish)({
+      type: 'contact',
+      contact: carol.id,
+      following: true,
+    }),
 
     // carol follows alice & bob
-    pify(carol.db.publish)({ type: 'contact', contact: alice.id, following: true }),
-    pify(carol.db.publish)({ type: 'contact', contact: bob.id, following: true }),
+    pify(carol.db.publish)({
+      type: 'contact',
+      contact: alice.id,
+      following: true,
+    }),
+    pify(carol.db.publish)({
+      type: 'contact',
+      contact: bob.id,
+      following: true,
+    }),
   ])
   t.pass('published all the messages')
 
@@ -88,9 +112,9 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
   ])
   t.pass('getVectorClocks')
 
-  t.deepEqual(clockAlice, expectedClock, 'alice\'s clock is correct')
-  t.deepEqual(clockBob, expectedClock, 'bob\'s clock is correct')
-  t.deepEqual(clockCarol, expectedClock, 'carol\'s clock is correct')
+  t.deepEqual(clockAlice, expectedClock, "alice's clock is correct")
+  t.deepEqual(clockBob, expectedClock, "bob's clock is correct")
+  t.deepEqual(clockCarol, expectedClock, "carol's clock is correct")
 
   await Promise.all([
     pify(connectionBA.close)(true),
@@ -101,7 +125,7 @@ tape('replicate between 3 peers, using ssb-db2', async (t) => {
   await Promise.all([
     pify(alice.close)(true),
     pify(bob.close)(true),
-    pify(carol.close)(true)
+    pify(carol.close)(true),
   ])
 
   t.end()
@@ -149,23 +173,47 @@ tape('replicate between 3 peers, using ssb-db2, restarting', async (t) => {
     pify(carol.db.publish)({ type: 'post', text: 'hello' }),
 
     // alice follows bob & carol
-    pify(alice.db.publish)({ type: 'contact', contact: bob.id, following: true }),
-    pify(alice.db.publish)({ type: 'contact', contact: carol.id, following: true }),
+    pify(alice.db.publish)({
+      type: 'contact',
+      contact: bob.id,
+      following: true,
+    }),
+    pify(alice.db.publish)({
+      type: 'contact',
+      contact: carol.id,
+      following: true,
+    }),
 
     // bob follows alice & carol
-    pify(bob.db.publish)({ type: 'contact', contact: alice.id, following: true }),
-    pify(bob.db.publish)({ type: 'contact', contact: carol.id, following: true }),
+    pify(bob.db.publish)({
+      type: 'contact',
+      contact: alice.id,
+      following: true,
+    }),
+    pify(bob.db.publish)({
+      type: 'contact',
+      contact: carol.id,
+      following: true,
+    }),
 
     // carol follows alice & bob
-    pify(carol.db.publish)({ type: 'contact', contact: alice.id, following: true }),
-    pify(carol.db.publish)({ type: 'contact', contact: bob.id, following: true }),
+    pify(carol.db.publish)({
+      type: 'contact',
+      contact: alice.id,
+      following: true,
+    }),
+    pify(carol.db.publish)({
+      type: 'contact',
+      contact: bob.id,
+      following: true,
+    }),
   ])
   t.pass('published all the messages')
 
   await Promise.all([
     pify(alice.close)(true),
     pify(bob.close)(true),
-    pify(carol.close)(true)
+    pify(carol.close)(true),
   ])
   t.pass('closed the 3 peers')
 
@@ -211,9 +259,9 @@ tape('replicate between 3 peers, using ssb-db2, restarting', async (t) => {
   ])
   t.pass('getVectorClocks')
 
-  t.deepEqual(clockAlice, expectedClock, 'alice\'s clock is correct')
-  t.deepEqual(clockBob, expectedClock, 'bob\'s clock is correct')
-  t.deepEqual(clockCarol, expectedClock, 'carol\'s clock is correct')
+  t.deepEqual(clockAlice, expectedClock, "alice's clock is correct")
+  t.deepEqual(clockBob, expectedClock, "bob's clock is correct")
+  t.deepEqual(clockCarol, expectedClock, "carol's clock is correct")
 
   await Promise.all([
     pify(connectionBA.close)(true),
@@ -224,7 +272,7 @@ tape('replicate between 3 peers, using ssb-db2, restarting', async (t) => {
   await Promise.all([
     pify(alice.close)(true),
     pify(bob.close)(true),
-    pify(carol.close)(true)
+    pify(carol.close)(true),
   ])
 
   t.end()
