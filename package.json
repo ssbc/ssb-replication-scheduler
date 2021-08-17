@@ -19,8 +19,11 @@
   "devDependencies": {
     "cat-names": "^3.0.0",
     "dog-names": "^2.0.0",
+    "husky": "^4.3.0",
     "mkdirp": "^1.0.4",
     "nyc": "^15.1.0",
+    "prettier": "^2.1.2",
+    "pretty-quick": "^3.1.0",
     "promisify-4loc": "^1.0.0",
     "pull-paramap": "^1.2.2",
     "rimraf": "^3.0.2",
@@ -38,6 +41,13 @@
   },
   "scripts": {
     "test": "tape 'test/@(unit|integration)/*.js' | tap-spec",
-    "coverage": "nyc npm run test"
+    "coverage": "nyc npm run test",
+    "format-code": "prettier --write \"*.js\" \"test/(integration|misc|unit)/*.js\"",
+    "format-code-staged": "pretty-quick --staged --pattern \"*.js\" --pattern \"test/(integration|misc|unit)/*.js\""
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run format-code-staged"
+    }
   }
 }

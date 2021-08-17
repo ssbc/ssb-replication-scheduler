@@ -8,26 +8,25 @@ tape('listen to friends stream and ebt.blocks initial blocked peers', (t) => {
   const bobId = ssbKeys.generate().id
   t.pass('bob is ' + bobId)
 
-  Server
-    .use({
-      name: 'friends',
-      init(sbot) {
-        return {
-          graphStream() {
-            return pull.values([
-              {
-                [sbot.id]: {
-                  [bobId]: -1
-                }
-              }
-            ])
-          },
-          hopStream() {
-            return pull.empty()
-          }
-        }
-      },
-    })
+  Server.use({
+    name: 'friends',
+    init(sbot) {
+      return {
+        graphStream() {
+          return pull.values([
+            {
+              [sbot.id]: {
+                [bobId]: -1,
+              },
+            },
+          ])
+        },
+        hopStream() {
+          return pull.empty()
+        },
+      }
+    },
+  })
     .use({
       name: 'ebt',
       init(sbot) {
@@ -42,11 +41,11 @@ tape('listen to friends stream and ebt.blocks initial blocked peers', (t) => {
             t.equals(orig, sbot.id, 'self feed id')
             t.equals(dest, bobId, 'blocked feed id matches')
             t.equals(bool, true, 'bool matches')
-            sbot.close(err => {
+            sbot.close((err) => {
               t.error(err, 'close sbot')
               t.end()
             })
-          }
+          },
         }
       },
     })
@@ -58,34 +57,39 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
   t.plan(15)
   const bobId = ssbKeys.generate().id
 
-  const expectedRequest = [[bobId, false], [bobId, false]]
-  const expectedBlock = [[bobId, true], [bobId, false]]
+  const expectedRequest = [
+    [bobId, false],
+    [bobId, false],
+  ]
+  const expectedBlock = [
+    [bobId, true],
+    [bobId, false],
+  ]
 
-  Server
-    .use({
-      name: 'friends',
-      init(sbot) {
-        return {
-          graphStream() {
-            return pull.values([
-              {
-                [sbot.id]: {
-                  [bobId]: -1
-                }
+  Server.use({
+    name: 'friends',
+    init(sbot) {
+      return {
+        graphStream() {
+          return pull.values([
+            {
+              [sbot.id]: {
+                [bobId]: -1,
               },
-              {
-                [sbot.id]: {
-                  [bobId]: -2,
-                },
+            },
+            {
+              [sbot.id]: {
+                [bobId]: -2,
               },
-            ])
-          },
-          hopStream() {
-            return pull.empty()
-          }
-        }
-      },
-    })
+            },
+          ])
+        },
+        hopStream() {
+          return pull.empty()
+        },
+      }
+    },
+  })
     .use({
       name: 'ebt',
       init(sbot) {
@@ -106,12 +110,12 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
             t.equals(bool, expectedBool, 'bool matches')
 
             if (expectedBlock.length === 0 && expectedRequest.length === 0) {
-              sbot.close(err => {
+              sbot.close((err) => {
                 t.error(err, 'close sbot')
                 t.end()
               })
             }
-          }
+          },
         }
       },
     })

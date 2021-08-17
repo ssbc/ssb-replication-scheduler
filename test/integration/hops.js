@@ -9,7 +9,7 @@ const sleep = require('util').promisify(setTimeout)
 const u = require('../misc/util')
 
 const createSsbServer = SecretStack({
-  caps: {shs: crypto.randomBytes(32).toString('base64')},
+  caps: { shs: crypto.randomBytes(32).toString('base64') },
 })
   .use(require('ssb-db'))
   .use(require('ssb-ebt'))
@@ -72,7 +72,7 @@ tape('hops 1', async (t) => {
     pify(alice.publish)(u.follow(bob.id)),
     pify(bob.publish)(u.follow(carol.id)),
     pify(carol.publish)(u.follow(david.id)),
-    pify(david.publish)({type: 'post', text: 'hello'}),
+    pify(david.publish)({ type: 'post', text: 'hello' }),
   ])
 
   const [rpcAB, rpcBC, rpcCD] = await Promise.all([

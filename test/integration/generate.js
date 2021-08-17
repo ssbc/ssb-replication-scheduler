@@ -42,7 +42,7 @@ test('generate fixture with flumelog-offset', async (t) => {
 
   t.true(
     fs.existsSync(path.join(ALICE_DIR, 'flume', 'log.offset')),
-    "alice's log.offset was created",
+    "alice's log.offset was created"
   )
   t.end()
 })
@@ -93,7 +93,11 @@ test('tests large-scale EBT replication', async (t) => {
   const clockAlice = await pify(alice.getVectorClock)()
   const clockBob = await pify(bob.getVectorClock)()
 
-  t.equals(clockBob[alice.id], clockAlice[alice.id], 'bob has all of alice\'s data')
+  t.equals(
+    clockBob[alice.id],
+    clockAlice[alice.id],
+    "bob has all of alice's data"
+  )
 
   const prog = alice.progress()
   t.ok(prog.indexes, 'alice indexes are okay')
@@ -101,9 +105,6 @@ test('tests large-scale EBT replication', async (t) => {
   t.ok(prog.ebt.target, 'alice ebt.target is okay')
   t.strictEqual(prog.ebt.current, prog.ebt.target, 'alice ebt finished')
 
-  await Promise.all([
-    pify(alice.close)(true),
-    pify(bob.close)(true)
-  ])
+  await Promise.all([pify(alice.close)(true), pify(bob.close)(true)])
   t.end()
 })

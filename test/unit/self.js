@@ -5,20 +5,19 @@ const Server = require('scuttle-testbot')
 tape('replicates myself', (t) => {
   t.plan(3)
 
-  Server
-    .use({
-      name: 'friends',
-      init(sbot) {
-        return {
-          graphStream() {
-            return pull.empty()
-          },
-          hopStream() {
-            return pull.empty()
-          },
-        }
-      },
-    })
+  Server.use({
+    name: 'friends',
+    init(sbot) {
+      return {
+        graphStream() {
+          return pull.empty()
+        },
+        hopStream() {
+          return pull.empty()
+        },
+      }
+    },
+  })
     .use({
       name: 'ebt',
       init(sbot) {

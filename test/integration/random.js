@@ -64,7 +64,7 @@ function generateAnimals(bot, mainFeed, amountFeeds, amountMsgs, doneCB) {
                   posts.shift()
                 }
                 cb(null, msg)
-              },
+              }
             )
           } else {
             const post = u.randary(posts)
@@ -74,13 +74,13 @@ function generateAnimals(bot, mainFeed, amountFeeds, amountMsgs, doneCB) {
                 repliesTo: post,
                 text: feed.animal === 'dog' ? 'woof woof' : 'purr',
               },
-              cb,
+              cb
             )
           }
         }, 32),
-        pull.drain(null, doneCB),
+        pull.drain(null, doneCB)
       )
-    }),
+    })
   )
 }
 
@@ -89,8 +89,8 @@ const alice = createSsbServer({
   timeout: CONNECTION_TIMEOUT,
   keys: ssbKeys.generate(),
   friends: {
-    hops: 1
-  }
+    hops: 1,
+  },
 })
 
 let liveMsgCount = 0
@@ -106,7 +106,7 @@ tape('generate random network', async (t) => {
     alice,
     { add: alice.publish, id: alice.id },
     AMOUNT_FEEDS,
-    AMOUNT_MSGS,
+    AMOUNT_MSGS
   )
 
   const generated = await pify(alice.getVectorClock)()
@@ -123,8 +123,8 @@ tape('generate random network', async (t) => {
 
   t.pass(
     `generated ${total} msgs over ${feeds} feeds in ${duration.toFixed(
-      1,
-    )}s (rate: ${rate} msgs/s)`,
+      1
+    )}s (rate: ${rate} msgs/s)`
   )
   t.equal(total, AMOUNT_MSGS + 1 + AMOUNT_FEEDS + 1, 'expected amount of msgs')
   t.equal(feeds, AMOUNT_FEEDS + 1, 'expected amount of feeds')
@@ -150,19 +150,19 @@ tape('read all history streams', function (t) {
         t.pass('dump all messages via createLogStream')
         t.pass(
           `all histories dumped ${msgs} msgs in ${duration.toFixed(
-            1,
-          )}s (rate ${rate} msgs/s)`,
+            1
+          )}s (rate ${rate} msgs/s)`
         )
         t.pass(`live msg count: ${liveMsgCount}`)
         t.equal(msgs, AMOUNT_FEEDS + AMOUNT_MSGS + 2, 'expected amount of msgs')
         t.equal(
           liveMsgCount,
           AMOUNT_FEEDS + AMOUNT_MSGS + 2,
-          'expected live amount of msgs',
+          'expected live amount of msgs'
         )
         t.end()
-      },
-    ),
+      }
+    )
   )
 })
 
@@ -178,8 +178,8 @@ tape('replicate social network for animals', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     keys: ssbKeys.generate(),
     friends: {
-      hops: 1
-    }
+      hops: 1,
+    },
   })
 
   if (!bob.friends) {
