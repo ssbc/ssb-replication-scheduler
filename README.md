@@ -64,49 +64,79 @@ Some parameters and opinions can be configured by the user or by application
 code through the conventional [ssb-config](https://github.com/ssbc/ssb-config)
 object. The possible options are listed below:
 
-````js
+```js
 {
   replicationScheduler: {
     /**
      * If `partialReplication` is an object, it tells the replication scheduler
-     * to perform partial replication, whenever remote feeds support it. The
-     * object describes the tree of meta feeds that we are interested in
-     * replicating. If `partialReplication` is `false` (which it is, by
-     * default), then all friendly feeds will be requested in full.
+     * to perform partial replication, whenever remote feeds support it. If
+     * `partialReplication` is `false` (which it is, by default), then all
+     * friendly feeds will be requested in full.
      *
-     * The tree of objects and arrays describes which keys in the metafeeds and
-     * subfeeds must match exactly the values given. So that if we write
-     * `feedpurposes: 'indexes'`, then we are interested in matching the
-     * metafeed that has the field `feedpurposes` exactly matching the value
-     * "indexes". All specified fields must match, but fields omitted are
-     * allowed to be any value. If the value is the special string "$main" or
-     * "$root", then they refer to (respectively) the IDs of the main feed
-     * and of the root meta feed.
-     *
-     * Example:
-     *
-     * ```js
-     * partialReplication: {
-     *   children: [
-     *     {
-     *     feedpurpose: 'indexes',
-     *     children: [
-     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'post' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'vote' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'about' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'contact' } } }
-     *     ]
-     *     },
-     *     { feedpurpose: 'coolgame' },
-     *     { feedpurpose: 'git-ssb' },
-     *   ]
-     * }
-     * ```
+     * Read below more about this configuration.
      */
     partialReplication: false,
   }
 }
-````
+```
+
+#### Configuring partial replication
+
+The `config.replicationScheduler.partialReplication` object describes the tree
+of meta feeds that we are interested in replicating.
+
+It is recursively made up of objects and arrays describes which **keys** in the
+metafeeds and subfeeds must match exactly the **values** given. So that if we
+write `feedpurposes: 'indexes'`, it means we are interested in matching the
+metafeed that has the field `feedpurposes` exactly matching the value "indexes".
+All specified fields must match, but omitted fields are allowed to be any value.
+
+The field `subfeeds` is not matching an actual field, instead, it is assumes we
+are dealing with a meta feed and this is describing its subfeeds that we would
+like to replicate.
+
+If the value is the special string `"$main"` or `"$root"`, then they refer to
+(respectively) the IDs of the *main feed* and of the *root meta feed*.
+
+Example:
+
+```js
+partialReplication: {
+  subfeeds: [
+    {
+      feedpurpose: 'indexes',
+      subfeeds: [
+        {
+          metadata: {
+            querylang: 'ssb-ql-0',
+            query: { author: '$main', type: 'post' },
+          },
+        },
+        {
+          metadata: {
+            querylang: 'ssb-ql-0',
+            query: { author: '$main', type: 'vote' },
+          },
+        },
+        {
+          metadata: {
+            querylang: 'ssb-ql-0',
+            query: { author: '$main', type: 'about' },
+          },
+        },
+        {
+          metadata: {
+            querylang: 'ssb-ql-0',
+            query: { author: '$main', type: 'contact' },
+          },
+        },
+      ],
+    },
+    { feedpurpose: 'coolgame' },
+    { feedpurpose: 'git-ssb' },
+  ]
+}
+```
 
 ### muxrpc APIs
 
