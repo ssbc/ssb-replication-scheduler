@@ -5,6 +5,10 @@
 const pull = require('pull-stream')
 const RequestManager = require('./req-manager')
 
+const DEFAULT_OPTS = {
+  partialReplication: false,
+}
+
 exports.name = 'replicationScheduler'
 exports.version = '1.0.0'
 exports.manifest = {
@@ -21,12 +25,14 @@ exports.init = function (ssb, config) {
     )
   }
 
+  const opts = config.replicationScheduler || DEFAULT_OPTS
+
+  const requestManager = new RequestManager(ssb, opts)
+
   // Note: ssb.ebt.request and ssb.ebt.block are idempotent operations,
   // so it's safe to call these methods redundantly, which is most likely
   // true in most cases. These three blocks below may sometimes overlap, but
   // that's okay, as long as we cover *all* cases.
-
-  const requestManager = new RequestManager(ssb, config)
 
   // Replicate myself ASAP, without request manager
   ssb.ebt.request(ssb.id, true)

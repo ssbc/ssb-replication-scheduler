@@ -1,13 +1,9 @@
 const pull = require('pull-stream')
 
-const DEFAULT_OPTS = {
-  partialReplication: false,
-}
-
 module.exports = class RequestManager {
-  constructor(ssb, config) {
+  constructor(ssb, opts) {
     this._ssb = ssb
-    this._opts = config.replicationScheduler || DEFAULT_OPTS
+    this._opts = opts
     this._requestables = new Set()
     this._requestedFully = new Set()
     this._requestedPartially = new Set()
