@@ -68,31 +68,42 @@ object. The possible options are listed below:
 {
   replicationScheduler: {
     /**
-     * If `partially` is an array, it tells the replication scheduler to perform
-     * partial replication, whenever remote feeds support it. The array
-     * describes the tree of meta feeds that we are interested in replicating.
-     * If `partially` is `false (which it is, by default), then all friendly
-     * feeds will be requested in full.
+     * If `partialReplication` is an object, it tells the replication scheduler
+     * to perform partial replication, whenever remote feeds support it. The
+     * object describes the tree of meta feeds that we are interested in
+     * replicating. If `partialReplication` is `false` (which it is, by
+     * default), then all friendly feeds will be requested in full.
+     *
+     * The tree of objects and arrays describes which keys in the metafeeds and
+     * subfeeds must match exactly the values given. So that if we write
+     * `feedpurposes: 'indexes'`, then we are interested in matching the
+     * metafeed that has the field `feedpurposes` exactly matching the value
+     * "indexes". All specified fields must match, but fields omitted are
+     * allowed to be any value. If the value is the special string "$main" or
+     * "$root", then they refer to (respectively) the IDs of the main feed
+     * and of the root meta feed.
      *
      * Example:
      *
      * ```js
-     * partially: [
-     *   {
+     * partialReplication: {
+     *   children: [
+     *     {
      *     feedpurpose: 'indexes',
      *     children: [
-     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'post' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'vote' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'about' } } },
-     *       { metadata: { querylang: 'ssb-ql-0', query: { type: 'contact' } } }
+     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'post' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'vote' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'about' } } },
+     *       { metadata: { querylang: 'ssb-ql-0', query: { author: '$main', type: 'contact' } } }
      *     ]
-     *   },
-     *   { feedpurpose: 'coolgame' },
-     *   { feedpurpose: 'git-ssb' },
-     * ]
+     *     },
+     *     { feedpurpose: 'coolgame' },
+     *     { feedpurpose: 'git-ssb' },
+     *   ]
+     * }
      * ```
      */
-    partially: false,
+    partialReplication: false,
   }
 }
 ````

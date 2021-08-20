@@ -1,7 +1,7 @@
 const pull = require('pull-stream')
 
 const DEFAULT_OPTS = {
-  partially: false,
+  partialReplication: false,
 }
 
 module.exports = class RequestManager {
@@ -51,7 +51,7 @@ module.exports = class RequestManager {
     pull(
       pull.values([...this._requestables]),
       pull.asyncMap((feedId, cb) => {
-        if (!this._opts.partially) return cb(null, [feedId, false])
+        if (!this._opts.partialReplication) return cb(null, [feedId, false])
 
         this._supportsPartialReplication(feedId, (err, partially) => {
           if (err) cb(err)
