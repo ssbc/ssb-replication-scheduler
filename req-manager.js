@@ -16,7 +16,7 @@ module.exports = class RequestManager {
     if (this._requestedPartially.has(feedId)) return
 
     this._requestables.add(feedId)
-    this._flush()
+    this._flush() // FIXME: this may need some debouncing
   }
 
   reconfigure(opts) {
@@ -32,7 +32,7 @@ module.exports = class RequestManager {
   _requestPartially(feedId) {
     this._requestables.delete(feedId)
     this._requestedPartially.add(feedId)
-    // FIXME: implement. Go through this._opts.partially to detect subfeeds
+    // FIXME: go through this._opts.partialReplication to detect subfeeds
   }
 
   _supportsPartialReplication(feedId, cb) {
