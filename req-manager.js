@@ -1,15 +1,20 @@
 const pull = require('pull-stream')
 
+const DEFAULT_PERIOD = 500
+
 module.exports = class RequestManager {
-  constructor(ssb, opts, metafeedFinder) {
+  constructor(ssb, opts, metafeedFinder, period) {
     this._ssb = ssb
     this._opts = opts
     this._metafeedFinder = metafeedFinder
+    this._period = period || DEFAULT_PERIOD
     this._requestables = new Set()
     this._requestedFully = new Set()
     this._requestedPartially = new Set()
     this._flushing = false
     this._wantsMoreFlushing = false
+    this._latestAdd = 0
+    this._timer = null
   }
 
   add(feedId) {
@@ -17,7 +22,8 @@ module.exports = class RequestManager {
     if (this._requestedPartially.has(feedId)) return
 
     this._requestables.add(feedId)
-    this._flush() // FIXME: this may need some debouncing
+    this._latestAdd = Date.now()
+    this._scheduleDebouncedFlush()
   }
 
   reconfigure(opts) {
@@ -43,13 +49,26 @@ module.exports = class RequestManager {
     })
   }
 
-  _flush() {
+  _scheduleDebouncedFlush() {
     if (this._flushing) {
       this._wantsMoreFlushing = true
       return
     }
     this._wantsMoreFlushing = false
 
+    if (this._timer) return // Timer is already enabled
+    this._timer = setInterval(() => {
+      // Turn off the timer if there is nothing to flush
+      if (this._requestables.size === 0) {
+        clearInterval(this._timer)
+        this._timer = null
+      }
+      // Flush if enough time has passed
+      else if (Date.now() - this._latestAdd > this._period) this._flush()
+    }, this._period * 0.5)
+  }
+
+  _flush() {
     pull(
       pull.values([...this._requestables]),
       pull.asyncMap((feedId, cb) => {
@@ -72,9 +91,7 @@ module.exports = class RequestManager {
           if (err) console.error(err)
           this._flushing = false
           if (this._wantsMoreFlushing) {
-            setTimeout(() => {
-              this._flush()
-            })
+            this._scheduleDebouncedFlush()
           }
         }
       )
