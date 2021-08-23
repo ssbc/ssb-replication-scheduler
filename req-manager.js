@@ -12,6 +12,9 @@ module.exports = class RequestManager {
   }
 
   add(feedId) {
+    if (this._requestedFully.has(feedId)) return
+    if (this._requestedPartially.has(feedId)) return
+
     this._requestables.add(feedId)
     this._flush()
   }
