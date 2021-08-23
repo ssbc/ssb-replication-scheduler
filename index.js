@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
+const MetafeedFinder = require('./metafeed-finder')
 const RequestManager = require('./req-manager')
 
 const DEFAULT_OPTS = {
@@ -27,7 +28,8 @@ exports.init = function (ssb, config) {
 
   const opts = config.replicationScheduler || DEFAULT_OPTS
 
-  const requestManager = new RequestManager(ssb, opts)
+  const metafeedFinder = new MetafeedFinder(ssb, opts)
+  const requestManager = new RequestManager(ssb, opts, metafeedFinder)
 
   // Note: ssb.ebt.request and ssb.ebt.block are idempotent operations,
   // so it's safe to call these methods redundantly, which is most likely

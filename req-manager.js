@@ -1,9 +1,10 @@
 const pull = require('pull-stream')
 
 module.exports = class RequestManager {
-  constructor(ssb, opts) {
+  constructor(ssb, opts, metafeedFinder) {
     this._ssb = ssb
     this._opts = opts
+    this._metafeedFinder = metafeedFinder
     this._requestables = new Set()
     this._requestedFully = new Set()
     this._requestedPartially = new Set()
@@ -36,8 +37,10 @@ module.exports = class RequestManager {
   }
 
   _supportsPartialReplication(feedId, cb) {
-    // FIXME: implement
-    cb(null, false)
+    this._metafeedFinder.get(feedId, (err, metafeedId) => {
+      if (err) cb(err)
+      else cb(null, !!metafeedId)
+    })
   }
 
   _flush() {
