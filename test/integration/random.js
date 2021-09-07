@@ -95,6 +95,9 @@ const alice = createSsbServer({
   friends: {
     hops: 1,
   },
+  replicationScheduler: {
+    debouncePeriod: 0,
+  },
 })
 
 let liveMsgCount = 0
@@ -183,6 +186,9 @@ tape('replicate social network for animals', async (t) => {
     keys: ssbKeys.generate(),
     friends: {
       hops: 1,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 

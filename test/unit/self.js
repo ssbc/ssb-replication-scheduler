@@ -41,5 +41,9 @@ tape('replicates myself', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })

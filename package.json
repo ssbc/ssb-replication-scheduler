@@ -24,7 +24,7 @@
     "ssb-network-errors": "^1.0.0",
     "ssb-ref": "^2.13.9",
     "ssb-subset-ql": "^0.2.0",
-    "ssb-uri2": "^1.2.0"
+    "ssb-uri2": "^1.5.2"
   },
   "devDependencies": {
     "cat-names": "^3.0.0",
@@ -41,7 +41,7 @@
     "secret-stack": "^6.4.0",
     "ssb-caps": "^1.1.0",
     "ssb-db": "^20.4.0",
-    "ssb-db2": "github:ssb-ngi-pointer/ssb-db2#support-bendy-butt-uri",
+    "ssb-db2": "github:ssb-ngi-pointer/ssb-db2#support-bendy-butt",
     "ssb-ebt": "^7.0.0",
     "ssb-fixtures": "^2.4.1",
     "ssb-friends": "^5.0.0",

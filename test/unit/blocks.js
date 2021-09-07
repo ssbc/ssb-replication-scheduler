@@ -54,7 +54,11 @@ tape('listen to friends stream and ebt.blocks initial blocked peers', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })
 
 tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
@@ -124,5 +128,9 @@ tape('listen to friends stream ebt.blocks subsequent blocks', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })

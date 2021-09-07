@@ -25,12 +25,18 @@ const alice = createSsbServer({
   temp: 'test-block2-alice',
   timeout: CONNECTION_TIMEOUT,
   keys: ssbKeys.generate(),
+  replicationScheduler: {
+    debouncePeriod: 0,
+  },
 })
 
 const bob = createSsbServer({
   temp: 'test-block2-bob',
   timeout: CONNECTION_TIMEOUT,
   keys: ssbKeys.generate(),
+  replicationScheduler: {
+    debouncePeriod: 0,
+  },
 })
 
 tape(

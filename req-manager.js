@@ -1,13 +1,16 @@
 const pull = require('pull-stream')
 
-const DEFAULT_PERIOD = 500
+const DEFAULT_PERIOD = 150
 
 module.exports = class RequestManager {
-  constructor(ssb, opts, metafeedFinder, period) {
+  constructor(ssb, opts, metafeedFinder) {
     this._ssb = ssb
     this._opts = opts
     this._metafeedFinder = metafeedFinder
-    this._period = period || DEFAULT_PERIOD
+    this._period =
+      typeof opts.debouncePeriod === 'number'
+        ? opts.debouncePeriod
+        : DEFAULT_PERIOD
     this._requestables = new Set()
     this._requestedFully = new Set()
     this._requestedPartially = new Set()
@@ -56,6 +59,11 @@ module.exports = class RequestManager {
     }
     this._wantsMoreFlushing = false
 
+    if (this._period === 0) {
+      this._flush()
+      return
+    }
+
     if (this._timer) return // Timer is already enabled
     this._timer = setInterval(() => {
       // Turn off the timer if there is nothing to flush
@@ -66,9 +74,11 @@ module.exports = class RequestManager {
       // Flush if enough time has passed
       else if (Date.now() - this._latestAdd > this._period) this._flush()
     }, this._period * 0.5)
+    if (this._timer.unref) this._timer.unref()
   }
 
   _flush() {
+    this._flushing = true
     pull(
       pull.values([...this._requestables]),
       pull.asyncMap((feedId, cb) => {

@@ -54,7 +54,11 @@ tape('listen to friends stream and replicates initial follows', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })
 
 tape('listen to friends stream and replicates subsequent follows', (t) => {
@@ -102,5 +106,9 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })

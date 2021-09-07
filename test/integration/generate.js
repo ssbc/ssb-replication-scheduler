@@ -63,6 +63,9 @@ test('tests large-scale EBT replication', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     keys: aliceKeys,
     friends: { hops: 2 },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const bob = createSbot({
@@ -70,6 +73,9 @@ test('tests large-scale EBT replication', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     keys: bobKeys,
     friends: { hops: 2 },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   t.ok(alice.getAddress(), 'alice has an address')
