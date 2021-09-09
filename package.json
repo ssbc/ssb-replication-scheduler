@@ -23,7 +23,7 @@
     "pull-stream": "^3.6.0",
     "ssb-network-errors": "^1.0.0",
     "ssb-ref": "^2.13.9",
-    "ssb-subset-ql": "^0.2.1",
+    "ssb-subset-ql": "~0.5.0",
     "ssb-uri2": "^1.5.2"
   },
   "devDependencies": {
