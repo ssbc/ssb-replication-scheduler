@@ -1,4 +1,8 @@
 const pull = require('pull-stream')
+const Ref = require('ssb-ref')
+const { QL0 } = require('ssb-subset-ql')
+const { isBendyButtV1FeedSSBURI } = require('ssb-uri2')
+const { where, author, live, toPullStream } = require('ssb-db2/operators')
 
 const DEFAULT_PERIOD = 150
 
@@ -33,16 +37,149 @@ module.exports = class RequestManager {
     this._opts = { ...this._opts, opts }
   }
 
+  /**
+   * @param {string} feedId classic feed ref or bendybutt feed URI
+   */
   _requestFully(feedId) {
     this._requestables.delete(feedId)
     this._requestedFully.add(feedId)
     this._ssb.ebt.request(feedId, true)
+    // FIXME: needs to support bendybutt and classic
   }
 
-  _requestPartially(feedId) {
-    this._requestables.delete(feedId)
-    this._requestedPartially.add(feedId)
-    // FIXME: go through this._opts.partialReplication to detect subfeeds
+  /**
+   * @param {string} mainFeedId classic feed ref which has announced a root MF
+   */
+  _requestPartially(mainFeedId) {
+    this._requestables.delete(mainFeedId)
+    this._requestedPartially.add(mainFeedId)
+
+    // Get metafeedId for this feedId
+    this._metafeedFinder.get(mainFeedId, (err, metafeedId) => {
+      if (err) {
+        console.error(err)
+      } else if (!metafeedId) {
+        console.error('cannot partially replicate ' + mainFeedId)
+      } else {
+        this._traverse(metafeedId, this._opts.partialReplication, mainFeedId)
+      }
+    })
+  }
+
+  /**
+   * @param {string | object} input a metafeedId or a msg concerning a metafeed
+   * @param {object} template one of the nodes in opts.partialReplication
+   * @param {string} mainFeedId
+   */
+  _traverse(input, template, mainFeedId) {
+    if (!this._matchesTemplate(input, template)) return
+
+    const metafeedId =
+      typeof input === 'string' ? input : input.value.content.subfeed
+
+    this._requestFully(metafeedId)
+
+    // ssb-db2 live query for metafeedId
+    //  * for every *tombstoned* subfeed, call ssb.ebt.request(subfeedId, false)
+    //  * for every *added* subfeed, match against template.subfeeds
+    //    * if not matched, ignore
+    //    * if matched and is classic feed, _requestFully(subfeedId)
+    //    * if matched with subfeeds and is bendybutt feed, then
+    //      * traverse(mainfeedId, subfeedId, matchedTemplate)
+    pull(
+      this._ssb.db.query(
+        where(author(metafeedId)),
+        live({ old: true }),
+        toPullStream()
+      ),
+      pull.filter((msg) => typeof msg.value.content !== 'string'),
+      // FIXME: this drain multiplied by N peers with support for
+      // partialReplication multiplied by M sub-meta-feeds for each means N*M
+      // live drains. Sounds like a performance nightmare, if N > 1000.
+      //
+      // Should we do instead one drain for all bendybutt messages and based
+      // on the bbmsg look up who it belongs to and then traverse the template?
+      pull.drain((msg) => {
+        const { type, subfeed } = msg.value.content
+        if (type.startsWith('metafeed/add/')) {
+          for (const childTemplate of template.subfeeds) {
+            if (this._matchesTemplate(msg, childTemplate, mainFeedId)) {
+              if (isBendyButtV1FeedSSBURI(subfeed)) {
+                this._traverse(msg, childTemplate, mainFeedId)
+              } else if (Ref.isFeedId(subfeed)) {
+                // FIXME: what if `subfeed` is an index feed?
+                this._requestedFully(subfeed)
+              } else {
+                console.error('cannot replicate unknown feed type: ' + subfeed)
+              }
+              break
+            }
+          }
+        } else if (type === 'metafeed/tombstone') {
+          this._ssb.ebt.request(subfeed, false)
+        }
+      })
+    )
+  }
+
+  _matchesTemplate(input, template, mainFeedId) {
+    // Input is `metafeedId`
+    if (typeof input === 'string' && isBendyButtV1FeedSSBURI(input)) {
+      const keys = Object.keys(template)
+      return (
+        keys.length === 1 &&
+        keys[0] === 'subfeeds' &&
+        Array.isArray(template.subfeeds)
+      )
+    }
+
+    // Input is a bendybutt message
+    if (typeof input === 'object' && input.value && input.value.content) {
+      const msg = input
+      const content = msg.value.content
+
+      // If present, feedpurpose must match
+      if (
+        template.feedpurpose &&
+        content.feedpurpose !== template.feedpurpose
+      ) {
+        return false
+      }
+
+      // If present, metadata must match
+      if (template.metadata && content.metadata) {
+        // If querylang is present, match ssb-ql-0 queries
+        if (template.metadata.querylang !== content.metadata.querylang) {
+          return false
+        }
+        if (template.metadata.querylang === 'ssb-ql-0') {
+          if (!QL0.parse(content.metadata.query)) return false
+          if (template.metadata.query) {
+            if (template.metadata.query.author === '$main') {
+              template.metadata.query.author = mainFeedId
+            }
+            if (
+              !QL0.isEquals(content.metadata.query, template.metadata.query)
+            ) {
+              return false
+            }
+          }
+        }
+
+        // Any other metadata field must match exactly
+        for (const field of Object.keys(template.metadata)) {
+          // Ignore these because we already handled them:
+          if (field === 'query') continue
+          if (field === 'querylang') continue
+
+          if (content.metadata[field] !== template.metadata[field]) return false
+        }
+      }
+
+      return true
+    }
+
+    return false
   }
 
   _supportsPartialReplication(feedId, cb) {
