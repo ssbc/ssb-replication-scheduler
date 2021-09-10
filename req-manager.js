@@ -116,6 +116,7 @@ module.exports = class RequestManager {
             }
           }
         } else if (type === 'metafeed/tombstone') {
+          // FIXME: what if this happens very quickly after add?
           this._ssb.ebt.request(subfeed, false)
         }
       })
