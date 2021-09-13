@@ -33,7 +33,7 @@ module.exports = class MetafeedFinder {
   }
 
   _loadAllFromLog() {
-    if (!ssb.db || !ssb.db.query) {
+    if (!this._ssb.db || !this._ssb.db.query) {
       throw new Error(
         'ssb-replication-scheduler expects ssb-db2 to be installed, to use partial replication'
       )
