@@ -1,9 +1,8 @@
 const pull = require('pull-stream')
-const Ref = require('ssb-ref')
 const debug = require('debug')('ssb:replication-scheduler')
-const SSBURI = require('ssb-uri2')
 const detectSsbNetworkErrorSeverity = require('ssb-network-errors')
 const { where, type, toPullStream } = require('ssb-db2/operators')
+const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 
 const DEFAULT_PERIOD = 500
 
@@ -41,6 +40,7 @@ module.exports = class MetafeedFinder {
 
     pull(
       this._ssb.db.query(where(type('metafeed/announce')), toPullStream()),
+      pull.filter(this._validateMetafeedAnnounce),
       pull.drain((msg) => {
         const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
         if (!mainFeedId || !metaFeedId) return
@@ -49,12 +49,19 @@ module.exports = class MetafeedFinder {
     )
   }
 
+  _validateMetafeedAnnounce(msg) {
+    const err = validateMetafeedAnnounce(msg)
+    if (err) {
+      console.warn(err)
+      return false
+    } else {
+      return true
+    }
+  }
+
   _pluckFromAnnounceMsg(msg) {
-    const { author, content } = msg.value
-    if (!Ref.isFeedId(author)) return []
-    const mainFeedId = author
-    if (!SSBURI.isBendyButtV1FeedSSBURI(content.metafeed)) return []
-    const metaFeedId = content.metafeed
+    const mainFeedId = msg.value.author
+    const metaFeedId = msg.value.content.metafeed
     return [mainFeedId, metaFeedId]
   }
 
@@ -125,6 +132,7 @@ module.exports = class MetafeedFinder {
     await this._forEachNeighborPeer((rpc, goToNextNeighbor) => {
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
+        pull.filter(this._validateMetafeedAnnounce),
         (drainer = pull.drain(
           (msg) => {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
