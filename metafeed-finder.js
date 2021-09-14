@@ -43,7 +43,6 @@ module.exports = class MetafeedFinder {
       pull.filter(this._validateMetafeedAnnounce),
       pull.drain((msg) => {
         const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
-        if (!mainFeedId || !metaFeedId) return
         this._map.set(mainFeedId, metaFeedId)
       })
     )
@@ -136,7 +135,6 @@ module.exports = class MetafeedFinder {
         (drainer = pull.drain(
           (msg) => {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
-            if (!mainFeedId || !metaFeedId) return
             if (requests.has(mainFeedId)) {
               this._map.set(mainFeedId, metaFeedId)
               this._persist(msg)
