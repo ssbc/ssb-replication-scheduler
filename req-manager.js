@@ -44,7 +44,7 @@ module.exports = class RequestManager {
     this._requestables.delete(feedId)
     this._requestedFully.add(feedId)
     this._ssb.ebt.request(feedId, true)
-    // FIXME: needs to support bendybutt and classic
+    // FIXME: needs to support bendybutt and classic, or not??
   }
 
   /**
