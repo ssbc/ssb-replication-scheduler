@@ -2,7 +2,14 @@ const pull = require('pull-stream')
 const Ref = require('ssb-ref')
 const { QL0 } = require('ssb-subset-ql')
 const { isBendyButtV1FeedSSBURI } = require('ssb-uri2')
-const { where, author, live, toPullStream } = require('ssb-db2/operators')
+const {
+  where,
+  and,
+  author,
+  isPublic,
+  live,
+  toPullStream,
+} = require('ssb-db2/operators')
 
 const DEFAULT_PERIOD = 150
 
@@ -88,11 +95,10 @@ module.exports = class RequestManager {
     //      * traverse(mainfeedId, subfeedId, matchedTemplate)
     pull(
       this._ssb.db.query(
-        where(author(metafeedId)),
+        where(and(author(metafeedId), isPublic())),
         live({ old: true }),
         toPullStream()
       ),
-      pull.filter((msg) => typeof msg.value.content !== 'string'),
       // FIXME: this drain multiplied by N peers with support for
       // partialReplication multiplied by M sub-meta-feeds for each means N*M
       // live drains. Sounds like a performance nightmare, if N > 1000.
