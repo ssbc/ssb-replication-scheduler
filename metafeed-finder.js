@@ -43,7 +43,7 @@ module.exports = class MetafeedFinder {
       pull.filter(this._validateMetafeedAnnounce),
       pull.drain(
         (msg) => {
-          const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
+          const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg.value)
           this._map.set(mainFeedId, metaFeedId)
         },
         () => {
@@ -66,9 +66,9 @@ module.exports = class MetafeedFinder {
     }
   }
 
-  _pluckFromAnnounceMsg(msg) {
-    const mainFeedId = msg.value.author
-    const metaFeedId = msg.value.content.metafeed
+  _pluckFromAnnounceMsg(msgVal) {
+    const mainFeedId = msgVal.author
+    const metaFeedId = msgVal.content.metafeed
     return [mainFeedId, metaFeedId]
   }
 
@@ -80,8 +80,8 @@ module.exports = class MetafeedFinder {
     this._scheduleDebouncedFlush()
   }
 
-  _persist(msg) {
-    this._ssb.db.addOOO(msg.value, (err) => {
+  _persist(msgVal) {
+    this._ssb.db.addOOO(msgVal, (err) => {
       if (err) {
         debug(
           'failed to addOOO for a metafeed/announce: %s',
@@ -140,10 +140,10 @@ module.exports = class MetafeedFinder {
       debug('"getSubset" on peer %s for metafeed/announce messages', rpc.id)
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
-        pull.filter(this._validateMetafeedAnnounce),
+        pull.filter((value) => this._validateMetafeedAnnounce({ value })),
         (drainer = pull.drain(
-          (msg) => {
-            const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
+          (msgVal) => {
+            const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
             if (requests.has(mainFeedId)) {
               debug(
                 'learned that main %s maps to rootMF %s',
@@ -151,7 +151,7 @@ module.exports = class MetafeedFinder {
                 metaFeedId
               )
               this._map.set(mainFeedId, metaFeedId)
-              this._persist(msg)
+              this._persist(msgVal)
               const callbacks = requests.get(mainFeedId)
               requests.delete(mainFeedId)
               for (const cb of callbacks) cb(null, metaFeedId)
