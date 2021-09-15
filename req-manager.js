@@ -42,6 +42,7 @@ module.exports = class RequestManager {
 
   reconfigure(opts) {
     this._opts = { ...this._opts, opts }
+    // FIXME: trigger a recalculation somehow
   }
 
   /**
