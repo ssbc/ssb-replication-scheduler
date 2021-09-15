@@ -42,7 +42,7 @@
     "ssb-caps": "^1.1.0",
     "ssb-db": "^20.4.0",
     "ssb-db2": "^2.5.2",
-    "ssb-ebt": "^7.0.0",
+    "ssb-ebt": "ssbc/ssb-ebt#partial-replication-changes",
     "ssb-fixtures": "^2.5.3",
     "ssb-friends": "^5.1.0",
     "ssb-index-feed-writer": "~0.6.0",
