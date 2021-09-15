@@ -158,7 +158,7 @@ module.exports = class MetafeedFinder {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
             if (requests.has(mainFeedId)) {
               debug(
-                'learned that main %s maps to rootMF %s',
+                'learned that main %s has rootMF %s',
                 mainFeedId,
                 metaFeedId
               )
