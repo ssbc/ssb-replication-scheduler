@@ -32,6 +32,7 @@ module.exports = class RequestManager {
   }
 
   add(feedId) {
+    if (this._requestables.has(feedId)) return
     if (this._requestedFully.has(feedId)) return
     if (this._requestedPartially.has(feedId)) return
 
@@ -115,7 +116,7 @@ module.exports = class RequestManager {
                 this._traverse(msg, childTemplate, mainFeedId)
               } else if (Ref.isFeedId(subfeed)) {
                 // FIXME: what if `subfeed` is an index feed?
-                this._requestedFully(subfeed)
+                this._requestFully(subfeed)
               } else {
                 console.error('cannot replicate unknown feed type: ' + subfeed)
               }
@@ -217,7 +218,11 @@ module.exports = class RequestManager {
         this._timer = null
       }
       // Flush if enough time has passed
-      else if (Date.now() - this._latestAdd > this._period) this._flush()
+      else if (Date.now() - this._latestAdd > this._period) {
+        clearInterval(this._timer)
+        this._timer = null
+        this._flush()
+      }
     }, this._period * 0.5)
     if (this._timer.unref) this._timer.unref()
   }
