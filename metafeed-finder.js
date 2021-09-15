@@ -157,11 +157,6 @@ module.exports = class MetafeedFinder {
           (msgVal) => {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
             if (requests.has(mainFeedId)) {
-              debug(
-                'learned that main %s has rootMF %s',
-                mainFeedId,
-                metaFeedId
-              )
               this._map.set(mainFeedId, metaFeedId)
               this._persist(msgVal)
               const callbacks = requests.get(mainFeedId)
