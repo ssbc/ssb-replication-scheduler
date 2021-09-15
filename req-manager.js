@@ -53,7 +53,6 @@ module.exports = class RequestManager {
     this._requestables.delete(feedId)
     this._requestedFully.add(feedId)
     this._ssb.ebt.request(feedId, true)
-    // FIXME: needs to support bendybutt and classic, or not??
   }
 
   /**
@@ -115,7 +114,6 @@ module.exports = class RequestManager {
               if (isBendyButtV1FeedSSBURI(subfeed)) {
                 this._traverse(msg, childTemplate, mainFeedId)
               } else if (Ref.isFeedId(subfeed)) {
-                // FIXME: what if `subfeed` is an index feed?
                 this._requestFully(subfeed)
               } else {
                 console.error('cannot replicate unknown feed type: ' + subfeed)
