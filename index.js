@@ -53,7 +53,6 @@ exports.init = function (ssb, config) {
           }
           // Compute every block edge, unless I am the edge destination
           if (dest !== ssb.id) {
-            // FIXME: consider meta feed and subfeed blocking
             ssb.ebt.block(source, dest, value === -1)
           }
         }

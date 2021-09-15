@@ -131,7 +131,6 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     },
   })
 
-  // FIXME: these should be inside the implementation of replication-scheduler
   alice.ebt.registerFormat('indexedfeed', indexedEBTFormat())
   alice.ebt.registerFormat('bendybutt-v1', bendyButtEBTFormat)
   bob.ebt.registerFormat('indexedfeed', indexedEBTFormat())

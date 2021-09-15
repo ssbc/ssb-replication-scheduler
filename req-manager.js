@@ -43,7 +43,6 @@ module.exports = class RequestManager {
 
   reconfigure(opts) {
     this._opts = { ...this._opts, opts }
-    // FIXME: trigger a recalculation somehow
   }
 
   /**
@@ -87,25 +86,12 @@ module.exports = class RequestManager {
 
     this._requestFully(metafeedId)
 
-    // ssb-db2 live query for metafeedId
-    //  * for every *tombstoned* subfeed, call ssb.ebt.request(subfeedId, false)
-    //  * for every *added* subfeed, match against template.subfeeds
-    //    * if not matched, ignore
-    //    * if matched and is classic feed, _requestFully(subfeedId)
-    //    * if matched with subfeeds and is bendybutt feed, then
-    //      * traverse(mainfeedId, subfeedId, matchedTemplate)
     pull(
       this._ssb.db.query(
         where(and(author(metafeedId), isPublic())),
         live({ old: true }),
         toPullStream()
       ),
-      // FIXME: this drain multiplied by N peers with support for
-      // partialReplication multiplied by M sub-meta-feeds for each means N*M
-      // live drains. Sounds like a performance nightmare, if N > 1000.
-      //
-      // Should we do instead one drain for all bendybutt messages and based
-      // on the bbmsg look up who it belongs to and then traverse the template?
       pull.drain((msg) => {
         const { type, subfeed } = msg.value.content
         if (type.startsWith('metafeed/add/')) {
@@ -122,7 +108,6 @@ module.exports = class RequestManager {
             }
           }
         } else if (type === 'metafeed/tombstone') {
-          // FIXME: what if this happens very quickly after add?
           this._ssb.ebt.request(subfeed, false)
         }
       })
