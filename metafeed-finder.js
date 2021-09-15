@@ -41,10 +41,18 @@ module.exports = class MetafeedFinder {
     pull(
       this._ssb.db.query(where(type('metafeed/announce')), toPullStream()),
       pull.filter(this._validateMetafeedAnnounce),
-      pull.drain((msg) => {
-        const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
-        this._map.set(mainFeedId, metaFeedId)
-      })
+      pull.drain(
+        (msg) => {
+          const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
+          this._map.set(mainFeedId, metaFeedId)
+        },
+        () => {
+          debug(
+            'loaded Map of all known main=>rootMF from disk, total %d',
+            this._map.size
+          )
+        }
+      )
     )
   }
 
@@ -129,6 +137,7 @@ module.exports = class MetafeedFinder {
     this._requestsByMainfeedId.clear()
 
     await this._forEachNeighborPeer((rpc, goToNextNeighbor) => {
+      debug('"getSubset" on peer %s for metafeed/announce messages', rpc.id)
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
         pull.filter(this._validateMetafeedAnnounce),
@@ -136,6 +145,11 @@ module.exports = class MetafeedFinder {
           (msg) => {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg)
             if (requests.has(mainFeedId)) {
+              debug(
+                'learned that main %s maps to rootMF %s',
+                mainFeedId,
+                metaFeedId
+              )
               this._map.set(mainFeedId, metaFeedId)
               this._persist(msg)
               const callbacks = requests.get(mainFeedId)
