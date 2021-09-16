@@ -16,7 +16,11 @@ module.exports = class MetafeedFinder {
     this._latestRequestTime = 0
     this._timer = null
 
-    if (this._opts.partialReplication) {
+    // If at least one hops template is configured, then load
+    if (
+      this._opts.partialReplication &&
+      Object.values(this._opts.partialReplication).some((templ) => !!templ)
+    ) {
       this._loadAllFromLog()
     }
   }

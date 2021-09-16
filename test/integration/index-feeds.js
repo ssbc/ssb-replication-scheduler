@@ -91,19 +91,24 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     },
     replicationScheduler: {
       partialReplication: {
-        subfeeds: [
-          {
-            feedpurpose: 'indexes',
-            subfeeds: [
-              {
-                metadata: {
-                  querylang: 'ssb-ql-0',
-                  query: { author: '$main', type: 'post' },
+        0: {
+          subfeeds: [
+            { feedpurpose: 'main' },
+            {
+              feedpurpose: 'indexes',
+              subfeeds: [
+                {
+                  metadata: {
+                    querylang: 'ssb-ql-0',
+                    query: { author: '$main', type: 'post', private: false },
+                  },
+                  $format: 'indexed'
                 },
-              },
-            ],
-          },
-        ],
+              ],
+            },
+          ],
+        },
+        1: null,
       },
     },
   })
@@ -114,19 +119,23 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     replicationScheduler: {
       partialReplication: {
-        subfeeds: [
-          {
-            feedpurpose: 'indexes',
-            subfeeds: [
-              {
-                metadata: {
-                  querylang: 'ssb-ql-0',
-                  query: { author: '$main', type: 'post' },
+        0: null,
+        1: {
+          subfeeds: [
+            {
+              feedpurpose: 'indexes',
+              subfeeds: [
+                {
+                  metadata: {
+                    querylang: 'ssb-ql-0',
+                    query: { author: '$main', type: 'post', private: false },
+                  },
+                  $format: 'indexed'
                 },
-              },
-            ],
-          },
-        ],
+              ],
+            },
+          ],
+        },
       },
     },
   })

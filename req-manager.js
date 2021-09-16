@@ -22,21 +22,24 @@ module.exports = class RequestManager {
       typeof opts.debouncePeriod === 'number'
         ? opts.debouncePeriod
         : DEFAULT_PERIOD
-    this._requestables = new Set()
-    this._requestedFully = new Set()
-    this._requestedPartially = new Set()
+    this._requestables = new Map()
+    this._requestedDirectly = new Map()
+    this._requestedIndirectly = new Map()
     this._flushing = false
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
+    this._hopsLevels = !this._opts.partialReplication
+      ? []
+      : Object.keys(this._opts.partialReplication).map(Number).sort()
   }
 
-  add(feedId) {
+  add(feedId, hops) {
     if (this._requestables.has(feedId)) return
-    if (this._requestedFully.has(feedId)) return
-    if (this._requestedPartially.has(feedId)) return
+    if (this._requestedDirectly.has(feedId)) return
+    if (this._requestedIndirectly.has(feedId)) return
 
-    this._requestables.add(feedId)
+    this._requestables.set(feedId, hops)
     this._latestAdd = Date.now()
     this._scheduleDebouncedFlush()
   }
@@ -48,18 +51,21 @@ module.exports = class RequestManager {
   /**
    * @param {string} feedId classic feed ref or bendybutt feed URI
    */
-  _requestFully(feedId) {
+  _requestDirectly(feedId, ebtFormat = undefined) {
+    const hops = this._requestables.get(feedId)
+    this._requestedDirectly.set(feedId, hops)
     this._requestables.delete(feedId)
-    this._requestedFully.add(feedId)
-    this._ssb.ebt.request(feedId, true)
+    this._ssb.ebt.request(feedId, true, ebtFormat)
   }
 
   /**
    * @param {string} mainFeedId classic feed ref which has announced a root MF
+   * @param {object} template one of the nodes in opts.partialReplication
    */
-  _requestPartially(mainFeedId) {
+  _requestIndirectly(mainFeedId, template) {
+    const hops = this._requestables.get(mainFeedId)
+    this._requestedIndirectly.set(mainFeedId, hops)
     this._requestables.delete(mainFeedId)
-    this._requestedPartially.add(mainFeedId)
 
     // Get metafeedId for this feedId
     this._metafeedFinder.get(mainFeedId, (err, metafeedId) => {
@@ -68,7 +74,7 @@ module.exports = class RequestManager {
       } else if (!metafeedId) {
         console.error('cannot partially replicate ' + mainFeedId)
       } else {
-        this._traverse(metafeedId, this._opts.partialReplication, mainFeedId)
+        this._traverse(metafeedId, template, mainFeedId)
       }
     })
   }
@@ -84,7 +90,7 @@ module.exports = class RequestManager {
     const metafeedId =
       typeof input === 'string' ? input : input.value.content.subfeed
 
-    this._requestFully(metafeedId)
+    this._requestDirectly(metafeedId)
 
     pull(
       this._ssb.db.query(
@@ -100,7 +106,7 @@ module.exports = class RequestManager {
               if (isBendyButtV1FeedSSBURI(subfeed)) {
                 this._traverse(msg, childTemplate, mainFeedId)
               } else if (Ref.isFeedId(subfeed)) {
-                this._requestFully(subfeed)
+                this._requestDirectly(subfeed, childTemplate['$format'])
               } else {
                 console.error('cannot replicate unknown feed type: ' + subfeed)
               }
@@ -181,6 +187,14 @@ module.exports = class RequestManager {
     })
   }
 
+  _findTemplateForHops(hops) {
+    if (!this._opts.partialReplication) return null
+    const eligible = this._hopsLevels.filter((h) => h >= hops)
+    const picked = Math.min(...eligible)
+    const x = this._opts.partialReplication[picked]
+    return x
+  }
+
   _scheduleDebouncedFlush() {
     if (this._flushing) {
       this._wantsMoreFlushing = true
@@ -213,22 +227,27 @@ module.exports = class RequestManager {
   _flush() {
     this._flushing = true
     pull(
-      pull.values([...this._requestables]),
-      pull.asyncMap((feedId, cb) => {
-        if (!this._opts.partialReplication) return cb(null, [feedId, false])
-        if (feedId === this._ssb.id) return cb(null, [feedId, true])
+      pull.values([...this._requestables.entries()]),
+      pull.asyncMap(([feedId, hops], cb) => {
+        const template = this._findTemplateForHops(hops)
+        if (!template) return cb(null, [feedId, null])
 
-        this._supportsPartialReplication(feedId, (err, partially) => {
-          if (err) cb(err)
-          else cb(null, [feedId, partially])
+        this._supportsPartialReplication(feedId, (err, supports) => {
+          if (err) {
+            cb(err)
+          } else if (supports) {
+            cb(null, [feedId, template])
+          } else {
+            cb(null, [feedId, null])
+          }
         })
       }),
       pull.drain(
-        ([feedId, partially]) => {
-          if (partially) {
-            this._requestPartially(feedId)
+        ([feedId, template]) => {
+          if (template) {
+            this._requestIndirectly(feedId, template)
           } else {
-            this._requestFully(feedId)
+            this._requestDirectly(feedId)
           }
         },
         (err) => {
