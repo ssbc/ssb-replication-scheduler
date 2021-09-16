@@ -10,6 +10,8 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
+const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
+const indexedEBTFormat = require('ssb-ebt/formats/indexed')
 
 const DEFAULT_PERIOD = 150
 
@@ -32,6 +34,15 @@ module.exports = class RequestManager {
     this._hopsLevels = !this._opts.partialReplication
       ? []
       : Object.keys(this._opts.partialReplication).map(Number).sort()
+
+    // If at least one hops template is configured, then setup ssb-ebt
+    if (
+      this._opts.partialReplication &&
+      Object.values(this._opts.partialReplication).some((templ) => !!templ)
+    ) {
+      this._ssb.ebt.registerFormat(indexedEBTFormat)
+      this._ssb.ebt.registerFormat(bendyButtEBTFormat)
+    }
   }
 
   add(feedId, hops) {

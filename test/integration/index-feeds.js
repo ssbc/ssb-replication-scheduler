@@ -140,12 +140,6 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     },
   })
 
-  alice.ebt.registerFormat('indexedfeed', indexedEBTFormat())
-  alice.ebt.registerFormat('bendybutt-v1', bendyButtEBTFormat)
-  bob.ebt.registerFormat('indexedfeed', indexedEBTFormat())
-  bob.ebt.registerFormat('bendybutt-v1', bendyButtEBTFormat)
-  t.pass('registered ebt formats')
-
   const connectionBA = await pify(bob.connect)(alice.getAddress())
   t.pass('peers are connected to each other')
 
