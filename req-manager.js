@@ -168,9 +168,8 @@ module.exports = class RequestManager {
 
   /**
    * @param {string} mainFeedId classic feed ref which has announced a root MF
-   * @param {object} template one of the nodes in opts.partialReplication
    */
-  _requestIndirectly(mainFeedId, template) {
+  _requestIndirectly(mainFeedId) {
     const hops = this._requestables.get(mainFeedId)
     this._requestedIndirectly.set(mainFeedId, hops)
     this._requestables.delete(mainFeedId)
