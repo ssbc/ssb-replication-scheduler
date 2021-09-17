@@ -12,6 +12,7 @@ module.exports = class MetafeedFinder {
     this._opts = opts
     this._period = period || DEFAULT_PERIOD
     this._map = new Map()
+    this._inverseMap = new Map()
     this._requestsByMainfeedId = new Map()
     this._latestRequestTime = 0
     this._timer = null
@@ -39,12 +40,17 @@ module.exports = class MetafeedFinder {
         } else {
           const metaFeedId = rootMF.keys.id
           this._map.set(mainFeedId, metaFeedId)
+          this._inverseMap.set(metaFeedId, mainFeedId)
           cb(null, metaFeedId)
         }
       })
     } else {
       this._request(mainFeedId, cb)
     }
+  }
+
+  getInverse(metaFeedId) {
+    return this._inverseMap.get(metaFeedId)
   }
 
   _loadAllFromLog() {
@@ -61,6 +67,7 @@ module.exports = class MetafeedFinder {
         (msg) => {
           const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg.value)
           this._map.set(mainFeedId, metaFeedId)
+          this._inverseMap.set(metaFeedId, mainFeedId)
         },
         () => {
           debug(
@@ -162,6 +169,7 @@ module.exports = class MetafeedFinder {
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
             if (requests.has(mainFeedId)) {
               this._map.set(mainFeedId, metaFeedId)
+              this._inverseMap.set(metaFeedId, mainFeedId)
               this._persist(msgVal)
               const callbacks = requests.get(mainFeedId)
               requests.delete(mainFeedId)

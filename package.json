@@ -47,7 +47,7 @@
     "ssb-friends": "^5.1.0",
     "ssb-index-feed-writer": "~0.6.0",
     "ssb-keys": "^8.2.0",
-    "ssb-meta-feeds": "~0.22.0",
+    "ssb-meta-feeds": "~0.22.1",
     "ssb-meta-feeds-rpc": "~0.2.0",
     "tap-spec": "^5.0.0",
     "tape": "^5.2.2"

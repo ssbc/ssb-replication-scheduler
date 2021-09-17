@@ -7,7 +7,7 @@ const MetafeedFinder = require('./metafeed-finder')
 const RequestManager = require('./req-manager')
 
 const DEFAULT_OPTS = {
-  partialReplication: false,
+  partialReplication: null,
 }
 
 exports.name = 'replicationScheduler'

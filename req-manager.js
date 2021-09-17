@@ -1,17 +1,15 @@
 const pull = require('pull-stream')
-const Ref = require('ssb-ref')
-const { QL0 } = require('ssb-subset-ql')
-const { isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const {
   where,
   and,
-  author,
+  authorIsBendyButtV1,
   isPublic,
   live,
   toPullStream,
 } = require('ssb-db2/operators')
 const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
+const Template = require('./template')
 
 const DEFAULT_PERIOD = 150
 
@@ -27,21 +25,20 @@ module.exports = class RequestManager {
     this._requestables = new Map()
     this._requestedDirectly = new Map()
     this._requestedIndirectly = new Map()
+    this._tombstoned = new Set()
     this._flushing = false
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
-    this._hopsLevels = !this._opts.partialReplication
-      ? []
-      : Object.keys(this._opts.partialReplication).map(Number).sort()
+    this._hasCloseHook = false
+    this._templates = this._setupTemplates(this._opts.partialReplication)
 
     // If at least one hops template is configured, then setup ssb-ebt
-    if (
-      this._opts.partialReplication &&
-      Object.values(this._opts.partialReplication).some((templ) => !!templ)
-    ) {
-      this._ssb.ebt.registerFormat(indexedEBTFormat)
+    if (this._templates) {
       this._ssb.ebt.registerFormat(bendyButtEBTFormat)
+      if (this._someTemplate((t) => t.hasIndexLeaf())) {
+        this._ssb.ebt.registerFormat(indexedEBTFormat)
+      }
     }
   }
 
@@ -57,6 +54,103 @@ module.exports = class RequestManager {
 
   reconfigure(opts) {
     this._opts = { ...this._opts, opts }
+  }
+
+  _setupTemplates(optsPartialReplication) {
+    if (!optsPartialReplication) return null
+    if (Object.values(optsPartialReplication).every((t) => !t)) return null
+    const hopsArr = Object.keys(optsPartialReplication).map(Number)
+    const templates = new Map()
+    for (const hops of hopsArr) {
+      if (optsPartialReplication[hops]) {
+        templates.set(hops, new Template(optsPartialReplication[hops]))
+      } else {
+        templates.set(hops, null)
+      }
+    }
+    return templates
+  }
+
+  _someTemplate(fn) {
+    if (!this._templates) return false
+    return [...this._templates.values()].filter((t) => !!t).some(fn)
+  }
+
+  _findTemplateForHops(hops) {
+    if (!this._templates) return null
+    const eligibleHopsArr = [...this._templates.keys()].filter((h) => h >= hops)
+    const pickedHops = Math.min(...eligibleHopsArr)
+    return this._templates.get(pickedHops)
+  }
+
+  _setupCloseHook() {
+    this._hasCloseHook = true
+    const that = this
+    this._ssb.close.hook(function (fn, args) {
+      if (that._liveDrainer) that._liveDrainer.abort()
+      fn.apply(this, args)
+    })
+  }
+
+  _scanBendyButtFeeds() {
+    if (this._liveDrainer) this._liveDrainer.abort()
+    if (!this._hasCloseHook) this._setupCloseHook()
+
+    pull(
+      this._ssb.db.query(
+        where(and(authorIsBendyButtV1(), isPublic())),
+        live({ old: true }),
+        toPullStream()
+      ),
+      pull.filter((msg) => this._ssb.metafeeds.validate.isValid(msg)),
+      (this._liveDrainer = pull.drain(
+        (msg) => {
+          const { type, subfeed } = msg.value.content
+          if (this._tombstoned.has(subfeed)) return
+
+          if (type.startsWith('metafeed/add/')) {
+            const path = this._getMetafeedTreePath(msg)
+            const metaFeedId = path[0]
+            const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+            if (!this._requestedIndirectly.has(mainFeedId)) return
+            const hops = this._requestedIndirectly.get(mainFeedId)
+            const template = this._findTemplateForHops(hops)
+            if (!template) return
+            const matchedNode = template.matchPath(path, mainFeedId)
+            if (!matchedNode) return
+            this._requestDirectly(subfeed, matchedNode['$format'])
+          } else if (type === 'metafeed/tombstone') {
+            this._tombstoned.add(subfeed)
+            this._ssb.ebt.request(subfeed, false)
+          }
+        },
+        (err) => {
+          if (err) return cb(err)
+        }
+      ))
+    )
+  }
+
+  /**
+   * Returns an array that represents the path from root meta feed to the given
+   * leaf `msg`.
+   *
+   * @param {*} msg a metafeed message
+   * @returns {Array}
+   */
+  _getMetafeedTreePath(msg) {
+    const details = this._ssb.metafeeds.findByIdSync(msg.value.content.subfeed)
+    const path = [details]
+    while (true) {
+      const head = path[0]
+      const details = this._ssb.metafeeds.findByIdSync(head.metafeed)
+      if (details) {
+        path.unshift(details)
+      } else {
+        path.unshift(head.metafeed)
+        return path
+      }
+    }
   }
 
   /**
@@ -85,110 +179,9 @@ module.exports = class RequestManager {
       } else if (!metafeedId) {
         console.error('cannot partially replicate ' + mainFeedId)
       } else {
-        this._traverse(metafeedId, template, mainFeedId)
+        this._requestDirectly(metafeedId)
       }
     })
-  }
-
-  /**
-   * @param {string | object} input a metafeedId or a msg concerning a metafeed
-   * @param {object} template one of the nodes in opts.partialReplication
-   * @param {string} mainFeedId
-   */
-  _traverse(input, template, mainFeedId) {
-    if (!this._matchesTemplate(input, template)) return
-
-    const metafeedId =
-      typeof input === 'string' ? input : input.value.content.subfeed
-
-    this._requestDirectly(metafeedId)
-
-    pull(
-      this._ssb.db.query(
-        where(and(author(metafeedId), isPublic())),
-        live({ old: true }),
-        toPullStream()
-      ),
-      pull.drain((msg) => {
-        const { type, subfeed } = msg.value.content
-        if (type.startsWith('metafeed/add/')) {
-          for (const childTemplate of template.subfeeds) {
-            if (this._matchesTemplate(msg, childTemplate, mainFeedId)) {
-              if (isBendyButtV1FeedSSBURI(subfeed)) {
-                this._traverse(msg, childTemplate, mainFeedId)
-              } else if (Ref.isFeedId(subfeed)) {
-                this._requestDirectly(subfeed, childTemplate['$format'])
-              } else {
-                console.error('cannot replicate unknown feed type: ' + subfeed)
-              }
-              break
-            }
-          }
-        } else if (type === 'metafeed/tombstone') {
-          this._ssb.ebt.request(subfeed, false)
-        }
-      })
-    )
-  }
-
-  _matchesTemplate(input, template, mainFeedId) {
-    // Input is `metafeedId`
-    if (typeof input === 'string' && isBendyButtV1FeedSSBURI(input)) {
-      const keys = Object.keys(template)
-      return (
-        keys.length === 1 &&
-        keys[0] === 'subfeeds' &&
-        Array.isArray(template.subfeeds)
-      )
-    }
-
-    // Input is a bendybutt message
-    if (typeof input === 'object' && input.value && input.value.content) {
-      const msg = input
-      const content = msg.value.content
-
-      // If present, feedpurpose must match
-      if (
-        template.feedpurpose &&
-        content.feedpurpose !== template.feedpurpose
-      ) {
-        return false
-      }
-
-      // If present, metadata must match
-      if (template.metadata && content.metadata) {
-        // If querylang is present, match ssb-ql-0 queries
-        if (template.metadata.querylang !== content.metadata.querylang) {
-          return false
-        }
-        if (template.metadata.querylang === 'ssb-ql-0') {
-          if (!QL0.parse(content.metadata.query)) return false
-          if (template.metadata.query) {
-            if (template.metadata.query.author === '$main') {
-              template.metadata.query.author = mainFeedId
-            }
-            if (
-              !QL0.isEquals(content.metadata.query, template.metadata.query)
-            ) {
-              return false
-            }
-          }
-        }
-
-        // Any other metadata field must match exactly
-        for (const field of Object.keys(template.metadata)) {
-          // Ignore these because we already handled them:
-          if (field === 'query') continue
-          if (field === 'querylang') continue
-
-          if (content.metadata[field] !== template.metadata[field]) return false
-        }
-      }
-
-      return true
-    }
-
-    return false
   }
 
   _supportsPartialReplication(feedId, cb) {
@@ -196,14 +189,6 @@ module.exports = class RequestManager {
       if (err) cb(err)
       else cb(null, !!metafeedId)
     })
-  }
-
-  _findTemplateForHops(hops) {
-    if (!this._opts.partialReplication) return null
-    const eligible = this._hopsLevels.filter((h) => h >= hops)
-    const picked = Math.min(...eligible)
-    const x = this._opts.partialReplication[picked]
-    return x
   }
 
   _scheduleDebouncedFlush() {
@@ -241,28 +226,24 @@ module.exports = class RequestManager {
       pull.values([...this._requestables.entries()]),
       pull.asyncMap(([feedId, hops], cb) => {
         const template = this._findTemplateForHops(hops)
-        if (!template) return cb(null, [feedId, null])
+        if (!template) return cb(null, [feedId, false])
 
         this._supportsPartialReplication(feedId, (err, supports) => {
-          if (err) {
-            cb(err)
-          } else if (supports) {
-            cb(null, [feedId, template])
-          } else {
-            cb(null, [feedId, null])
-          }
+          if (err) cb(err)
+          else cb(null, [feedId, supports])
         })
       }),
       pull.drain(
-        ([feedId, template]) => {
-          if (template) {
-            this._requestIndirectly(feedId, template)
+        ([feedId, supportsPartialReplication]) => {
+          if (supportsPartialReplication) {
+            this._requestIndirectly(feedId)
           } else {
             this._requestDirectly(feedId)
           }
         },
         (err) => {
           if (err) console.error(err)
+          if (this._templates) this._scanBendyButtFeeds()
           this._flushing = false
           if (this._wantsMoreFlushing) {
             this._scheduleDebouncedFlush()
