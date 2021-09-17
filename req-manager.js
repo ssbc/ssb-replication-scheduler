@@ -109,16 +109,19 @@ module.exports = class RequestManager {
           if (this._tombstoned.has(subfeed)) return
 
           if (type.startsWith('metafeed/add/')) {
-            const path = this._getMetafeedTreePath(msg)
-            const metaFeedId = path[0]
-            const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-            if (!this._requestedIndirectly.has(mainFeedId)) return
-            const hops = this._requestedIndirectly.get(mainFeedId)
-            const template = this._findTemplateForHops(hops)
-            if (!template) return
-            const matchedNode = template.matchPath(path, mainFeedId)
-            if (!matchedNode) return
-            this._requestDirectly(subfeed, matchedNode['$format'])
+            setTimeout(() => {
+              if (this._tombstoned.has(subfeed)) return
+              const path = this._getMetafeedTreePath(msg)
+              const metaFeedId = path[0]
+              const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+              if (!this._requestedIndirectly.has(mainFeedId)) return
+              const hops = this._requestedIndirectly.get(mainFeedId)
+              const template = this._findTemplateForHops(hops)
+              if (!template) return
+              const matchedNode = template.matchPath(path, mainFeedId)
+              if (!matchedNode) return
+              this._requestDirectly(subfeed, matchedNode['$format'])
+            }, this._period)
           } else if (type === 'metafeed/tombstone') {
             this._tombstoned.add(subfeed)
             this._ssb.ebt.request(subfeed, false)
