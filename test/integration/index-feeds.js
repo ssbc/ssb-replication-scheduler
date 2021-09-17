@@ -146,23 +146,6 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
   await sleep(REPLICATION_TIMEOUT)
   t.pass('replication period is over')
 
-  console.log('ALICE HAS----------------')
-  console.log(
-    (await alice.db.query(toPromise())).map((msg) => [
-      msg.value.author,
-      msg.value.content,
-    ])
-  )
-  console.log('-------------------------\n')
-  console.log('BOB HAS------------------')
-  console.log(
-    (await bob.db.query(toPromise())).map((msg) => [
-      msg.value.author,
-      msg.value.content,
-    ])
-  )
-  console.log('-------------------------')
-
   // Alice fully replicates Bob
   t.equals(
     await alice.db.query(
