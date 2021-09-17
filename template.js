@@ -96,13 +96,13 @@ module.exports = class Template {
         }
       }
 
-      if (Array.isArray(node.subfeeds)) {
+      if (Array.isArray(node.subfeeds) && path.length >= 2) {
         const childPath = path.slice(1)
         for (const childNode of node.subfeeds) {
           const matched = this._matchPath(childPath, childNode, mainFeedId)
           if (matched) return matched
         }
-        return node
+        return null
       } else {
         return node
       }

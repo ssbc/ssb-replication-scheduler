@@ -53,7 +53,17 @@ module.exports = class RequestManager {
   }
 
   reconfigure(opts) {
-    this._opts = { ...this._opts, opts }
+    this._opts = { ...this._opts, ...opts }
+    this._templates = this._setupTemplates(this._opts.partialReplication)
+    for (const [feedId, hops] of this._requestedDirectly) {
+      this._requestables.set(feedId, hops)
+      this._requestedDirectly.delete(feedId)
+    }
+    for (const [feedId, hops] of this._requestedIndirectly) {
+      this._requestables.set(feedId, hops)
+      this._requestedIndirectly.delete(feedId)
+    }
+    this._flush()
   }
 
   _setupTemplates(optsPartialReplication) {

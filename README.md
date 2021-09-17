@@ -84,9 +84,9 @@ object. The possible options are listed below:
 
 The `config.replicationScheduler.partialReplication` object describes the tree
 of meta feeds that we are interested in replicating, for each hops level. For
-each hops level we have a certain *template* to describe how replication should
+each hops level we have a certain _template_ to describe how replication should
 work at that level. Notice that this configuration cannot specify **who** we
-replicate (that's the job of ssb-friends and your chosen `hops`, see the *Usage*
+replicate (that's the job of ssb-friends and your chosen `hops`, see the _Usage_
 section above), this configuration just specifies **how** should we replicate a
 friendly peer, in other words, the level of granularity for those peers.
 
@@ -172,7 +172,7 @@ These special variables are always prefixed with **`$`**.
   - `$main`
   - `$root`
 
-The field *key* `$format` refers to [ssb-ebt](https://github.com/ssbc/ssb-ebt)
+The field _key_ `$format` refers to [ssb-ebt](https://github.com/ssbc/ssb-ebt)
 "replication formats" and can be included in a template to specify which
 replication format to use in ssb-ebt. The value of this field should be the
 format's name as a string.
@@ -200,42 +200,6 @@ partialReplication: {
         subfeeds: [
           {
             feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: null, private: true },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'post', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'vote', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'about', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'contact', private: false },
-            },
             $format: 'indexed',
           },
         ],

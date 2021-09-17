@@ -14,8 +14,6 @@ const {
   toPromise,
 } = require('ssb-db2/operators')
 const sleep = require('util').promisify(setTimeout)
-const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
-const indexedEBTFormat = require('ssb-ebt/formats/indexed')
 const { keysFor } = require('../misc/util')
 
 const createSsbServer = SecretStack({ caps })
@@ -29,8 +27,8 @@ const createSsbServer = SecretStack({ caps })
   .use(require('../..'))
 
 const CONNECTION_TIMEOUT = 500 // ms
-const REPLICATION_TIMEOUT = 10000 // ms
-const INDEX_WRITING_TIMEOUT = 2000 // ms
+const REPLICATION_TIMEOUT = 6000 // ms
+const INDEX_WRITING_TIMEOUT = 3000 // ms
 
 const aliceKeys = keysFor('alice')
 const bobKeys = keysFor('bob')
@@ -44,7 +42,10 @@ tape('setup', async (t) => {
     keys: aliceKeys,
     timeout: CONNECTION_TIMEOUT,
     indexFeedWriter: {
-      autostart: [{ type: 'post', private: false }],
+      autostart: [
+        { type: 'post', private: false },
+        { type: 'contact', private: false },
+      ],
     },
   })
 
@@ -87,7 +88,10 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     keys: aliceKeys,
     timeout: CONNECTION_TIMEOUT,
     indexFeedWriter: {
-      autostart: [{ type: 'post', private: false }],
+      autostart: [
+        { type: 'post', private: false },
+        { type: 'contact', private: false },
+      ],
     },
     replicationScheduler: {
       partialReplication: {
@@ -98,11 +102,8 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
               feedpurpose: 'indexes',
               subfeeds: [
                 {
-                  metadata: {
-                    querylang: 'ssb-ql-0',
-                    query: { author: '$main', type: 'post', private: false },
-                  },
-                  $format: 'indexed'
+                  feedpurpose: 'index',
+                  $format: 'indexed',
                 },
               ],
             },
@@ -130,7 +131,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
                     querylang: 'ssb-ql-0',
                     query: { author: '$main', type: 'post', private: false },
                   },
-                  $format: 'indexed'
+                  $format: 'indexed',
                 },
               ],
             },
@@ -196,6 +197,49 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     ),
     1,
     'bob has 1 metafeed/announce from alice'
+  )
+
+  bob.replicationScheduler.reconfigure({
+    partialReplication: {
+      0: null,
+      1: {
+        subfeeds: [
+          {
+            feedpurpose: 'indexes',
+            subfeeds: [
+              {
+                metadata: {
+                  querylang: 'ssb-ql-0',
+                  query: { author: '$main', type: 'post', private: false },
+                },
+                $format: 'indexed',
+              },
+              {
+                metadata: {
+                  querylang: 'ssb-ql-0',
+                  query: { author: '$main', type: 'contact', private: false },
+                },
+                $format: 'indexed',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  t.pass('reconfigure bob')
+
+  await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await bob.db.query(
+      where(and(type('contact'), author(alice.id))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'bob has 1 contact msgs from alice'
   )
 
   await pify(connectionBA.close)(true)
