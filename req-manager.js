@@ -23,8 +23,8 @@ module.exports = class RequestManager {
         ? opts.debouncePeriod
         : DEFAULT_PERIOD
     this._requestables = new Map()
-    this._requestedDirectly = new Map()
-    this._requestedIndirectly = new Map()
+    this._requested = new Map()
+    this._requestedPartially = new Map()
     this._tombstoned = new Set()
     this._flushing = false
     this._wantsMoreFlushing = false
@@ -44,8 +44,8 @@ module.exports = class RequestManager {
 
   add(feedId, hops) {
     if (this._requestables.has(feedId)) return
-    if (this._requestedDirectly.has(feedId)) return
-    if (this._requestedIndirectly.has(feedId)) return
+    if (this._requested.has(feedId)) return
+    if (this._requestedPartially.has(feedId)) return
 
     this._requestables.set(feedId, hops)
     this._latestAdd = Date.now()
@@ -55,13 +55,13 @@ module.exports = class RequestManager {
   reconfigure(opts) {
     this._opts = { ...this._opts, ...opts }
     this._templates = this._setupTemplates(this._opts.partialReplication)
-    for (const [feedId, hops] of this._requestedDirectly) {
+    for (const [feedId, hops] of this._requested) {
       this._requestables.set(feedId, hops)
-      this._requestedDirectly.delete(feedId)
+      this._requested.delete(feedId)
     }
-    for (const [feedId, hops] of this._requestedIndirectly) {
+    for (const [feedId, hops] of this._requestedPartially) {
       this._requestables.set(feedId, hops)
-      this._requestedIndirectly.delete(feedId)
+      this._requestedPartially.delete(feedId)
     }
     this._flush()
   }
@@ -124,13 +124,13 @@ module.exports = class RequestManager {
               const path = this._getMetafeedTreePath(msg)
               const metaFeedId = path[0]
               const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-              if (!this._requestedIndirectly.has(mainFeedId)) return
-              const hops = this._requestedIndirectly.get(mainFeedId)
+              if (!this._requestedPartially.has(mainFeedId)) return
+              const hops = this._requestedPartially.get(mainFeedId)
               const template = this._findTemplateForHops(hops)
               if (!template) return
               const matchedNode = template.matchPath(path, mainFeedId)
               if (!matchedNode) return
-              this._requestDirectly(subfeed, matchedNode['$format'])
+              this._request(subfeed, matchedNode['$format'])
             }, this._period)
           } else if (type === 'metafeed/tombstone') {
             this._tombstoned.add(subfeed)
@@ -169,9 +169,9 @@ module.exports = class RequestManager {
   /**
    * @param {string} feedId classic feed ref or bendybutt feed URI
    */
-  _requestDirectly(feedId, ebtFormat = undefined) {
+  _request(feedId, ebtFormat = undefined) {
     const hops = this._requestables.get(feedId)
-    this._requestedDirectly.set(feedId, hops)
+    this._requested.set(feedId, hops)
     this._requestables.delete(feedId)
     this._ssb.ebt.request(feedId, true, ebtFormat)
   }
@@ -179,9 +179,9 @@ module.exports = class RequestManager {
   /**
    * @param {string} mainFeedId classic feed ref which has announced a root MF
    */
-  _requestIndirectly(mainFeedId) {
+  _requestPartially(mainFeedId) {
     const hops = this._requestables.get(mainFeedId)
-    this._requestedIndirectly.set(mainFeedId, hops)
+    this._requestedPartially.set(mainFeedId, hops)
     this._requestables.delete(mainFeedId)
 
     // Get metafeedId for this feedId
@@ -191,7 +191,7 @@ module.exports = class RequestManager {
       } else if (!metafeedId) {
         console.error('cannot partially replicate ' + mainFeedId)
       } else {
-        this._requestDirectly(metafeedId)
+        this._request(metafeedId)
       }
     })
   }
@@ -248,9 +248,9 @@ module.exports = class RequestManager {
       pull.drain(
         ([feedId, supportsPartialReplication]) => {
           if (supportsPartialReplication) {
-            this._requestIndirectly(feedId)
+            this._requestPartially(feedId)
           } else {
-            this._requestDirectly(feedId)
+            this._request(feedId)
           }
         },
         (err) => {
