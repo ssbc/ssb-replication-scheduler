@@ -166,9 +166,6 @@ module.exports = class RequestManager {
     }
   }
 
-  /**
-   * @param {string} feedId classic feed ref or bendybutt feed URI
-   */
   _request(feedId, ebtFormat = undefined) {
     const hops = this._requestables.get(feedId)
     this._requested.set(feedId, hops)
@@ -176,20 +173,17 @@ module.exports = class RequestManager {
     this._ssb.ebt.request(feedId, true, ebtFormat)
   }
 
-  /**
-   * @param {string} mainFeedId classic feed ref which has announced a root MF
-   */
-  _requestPartially(mainFeedId) {
-    const hops = this._requestables.get(mainFeedId)
-    this._requestedPartially.set(mainFeedId, hops)
-    this._requestables.delete(mainFeedId)
+  _requestPartially(feedId) {
+    const hops = this._requestables.get(feedId)
+    this._requestedPartially.set(feedId, hops)
+    this._requestables.delete(feedId)
 
-    // Get metafeedId for this feedId
-    this._metafeedFinder.get(mainFeedId, (err, metafeedId) => {
+    // Get metafeedId for this (main) feedId
+    this._metafeedFinder.get(feedId, (err, metafeedId) => {
       if (err) {
         console.error(err)
       } else if (!metafeedId) {
-        console.error('cannot partially replicate ' + mainFeedId)
+        console.error('cannot partially replicate ' + feedId)
       } else {
         this._request(metafeedId)
       }
