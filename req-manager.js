@@ -63,6 +63,8 @@ module.exports = class RequestManager {
       this._requestables.set(feedId, hops)
       this._requestedPartially.delete(feedId)
     }
+    this._liveDrainer.abort()
+    this._liveDrainer = null
     this._flush()
   }
 
@@ -103,7 +105,7 @@ module.exports = class RequestManager {
   }
 
   _scanBendyButtFeeds() {
-    if (this._liveDrainer) this._liveDrainer.abort()
+    if (this._liveDrainer) return
     if (!this._hasCloseHook) this._setupCloseHook()
 
     pull(
