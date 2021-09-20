@@ -186,8 +186,8 @@ feed_ and of the _root meta feed_.
 In the example below, we set up partial replication with the meaning:
 
 - For hops 0 (that is, "yourself"), replicate some app feeds and all index feeds
-- For hops 1 (direct friends), replicate only some index feeds
-- For hops 2 and beyond, replicate only about index feed
+- For hops 1 (direct friends), replicate only 5 specific index feeds
+- For hops 2 and beyond, replicate only 2 specific index feeds
 
 ```js
 partialReplication: {
