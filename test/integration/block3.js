@@ -77,14 +77,16 @@ tape('alice blocks bob and both are connected to carla', async (t) => {
   t.equal(msgAtBob.value.author, alice.id)
   t.equal(msgAtBob.value.content.contact, bob.id)
 
+  const clockBob = await pify(bob.getVectorClock)()
+
   await pify(alice.publish)(u.block(bob.id))
 
   await sleep(REPLICATION_TIMEOUT)
 
-  const clockBob = await pify(bob.getVectorClock)()
+  const clockBob2 = await pify(bob.getVectorClock)()
   t.equals(
+    clockBob2[alice.id],
     clockBob[alice.id],
-    1,
     'bob does not receive the message where alice blocked him'
   )
 
