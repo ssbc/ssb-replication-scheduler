@@ -1,4 +1,3 @@
-const { isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const { QL0 } = require('ssb-subset-ql')
 
 /**
@@ -32,16 +31,17 @@ module.exports = class Template {
     }
   }
 
-  matchPath(path, mainFeedId) {
-    return this._matchPath(path, this._rootNode, mainFeedId)
+  matchBranch(branch, mainFeedId) {
+    return this._matchBranch(branch, this._rootNode, mainFeedId)
   }
 
-  _matchPath(path, node, mainFeedId) {
-    if (path.length === 0) return null
-    const head = path[0]
+  _matchBranch(branch, node, mainFeedId) {
+    if (branch.length === 0) return null
+    const head = branch[0]
+    const [feedId, details] = head
 
-    // Head is `metafeedId`
-    if (typeof head === 'string' && isBendyButtV1FeedSSBURI(head)) {
+    // Head is a root meta feed:
+    if (!details) {
       const keys = Object.keys(node)
       const rootMatches =
         keys.length === 1 &&
@@ -50,35 +50,37 @@ module.exports = class Template {
 
       if (!rootMatches) {
         return null
-      } else {
-        const childPath = path.slice(1)
+      } else if (branch.length >= 2) {
+        const childBranch = branch.slice(1)
         for (const childNode of node.subfeeds) {
-          const matched = this._matchPath(childPath, childNode, mainFeedId)
+          const matched = this._matchBranch(childBranch, childNode, mainFeedId)
           if (matched) return matched
         }
         return null
+      } else {
+        return node
       }
     }
 
-    // Head is a subfeed details
-    if (typeof head === 'object') {
+    // Head is a subfeed:
+    if (details) {
       // If present, feedpurpose must match
-      if (node.feedpurpose && head.feedpurpose !== node.feedpurpose) {
+      if (node.feedpurpose && details.feedpurpose !== node.feedpurpose) {
         return null
       }
 
       // If present, metadata must match
-      if (node.metadata && head.metadata) {
+      if (node.metadata && details.metadata) {
         // If querylang is present, match ssb-ql-0 queries
-        if (node.metadata.querylang !== head.metadata.querylang) {
+        if (node.metadata.querylang !== details.metadata.querylang) {
           return null
         }
         if (node.metadata.querylang === 'ssb-ql-0') {
-          if (!QL0.parse(head.metadata.query)) return null
+          if (!QL0.parse(details.metadata.query)) return null
           if (node.metadata.query) {
             const nodeQuery = { ...node.metadata.query }
             if (nodeQuery.author === '$main') nodeQuery.author = mainFeedId
-            if (!QL0.isEquals(head.metadata.query, nodeQuery)) {
+            if (!QL0.isEquals(details.metadata.query, nodeQuery)) {
               return null
             }
           }
@@ -90,16 +92,16 @@ module.exports = class Template {
           if (field === 'query') continue
           if (field === 'querylang') continue
 
-          if (head.metadata[field] !== node.metadata[field]) {
+          if (details.metadata[field] !== node.metadata[field]) {
             return null
           }
         }
       }
 
-      if (Array.isArray(node.subfeeds) && path.length >= 2) {
-        const childPath = path.slice(1)
+      if (Array.isArray(node.subfeeds) && branch.length >= 2) {
+        const childBranch = branch.slice(1)
         for (const childNode of node.subfeeds) {
-          const matched = this._matchPath(childPath, childNode, mainFeedId)
+          const matched = this._matchBranch(childBranch, childNode, mainFeedId)
           if (matched) return matched
         }
         return null

@@ -26,7 +26,7 @@ module.exports = class MetafeedFinder {
     }
   }
 
-  get(mainFeedId, cb) {
+  fetch(mainFeedId, cb) {
     if (this._map.has(mainFeedId)) {
       const metaFeedId = this._map.get(mainFeedId)
       cb(null, metaFeedId)
@@ -47,6 +47,10 @@ module.exports = class MetafeedFinder {
     } else {
       this._request(mainFeedId, cb)
     }
+  }
+
+  get(mainFeedId) {
+    return this._map.get(mainFeedId)
   }
 
   getInverse(metaFeedId) {

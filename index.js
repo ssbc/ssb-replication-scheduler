@@ -48,11 +48,10 @@ exports.init = function (ssb, config) {
           const value = graph[source][dest]
           // Only if I am the `source` and `value >= 0`, request replication
           if (source === ssb.id) {
-            if (value >= 0) requestManager.add(dest, value)
-            else ssb.ebt.request(dest, false)
+            requestManager.add(dest, value)
           }
-          // Compute every block edge, unless I am the edge destination
-          if (dest !== ssb.id) {
+          // Compute every block edge unrelated to me
+          if (source !== ssb.id && dest !== ssb.id) {
             ssb.ebt.block(source, dest, value === -1)
           }
         }
@@ -65,21 +64,7 @@ exports.init = function (ssb, config) {
     ssb.friends.hopStream({ old: true, live: true }),
     pull.drain((hops) => {
       for (const dest of Object.keys(hops)) {
-        const value = hops[dest]
-        // myself or friendly peers
-        if (value >= 0) {
-          requestManager.add(dest, value)
-          ssb.ebt.block(ssb.id, dest, false)
-        }
-        // blocked peers
-        else if (value === -1) {
-          ssb.ebt.request(dest, false)
-          ssb.ebt.block(ssb.id, dest, true)
-        }
-        // unfollowed/unblocked peers
-        else if (value < -1) {
-          ssb.ebt.request(dest, false)
-        }
+        requestManager.add(dest, hops[dest])
       }
     })
   )

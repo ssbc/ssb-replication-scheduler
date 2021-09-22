@@ -10,11 +10,12 @@ const {
   and,
   type,
   author,
+  authorIsBendyButtV1,
   count,
   toPromise,
 } = require('ssb-db2/operators')
 const sleep = require('util').promisify(setTimeout)
-const { keysFor } = require('../misc/util')
+const u = require('../misc/util')
 
 const createSsbServer = SecretStack({ caps })
   .use(require('ssb-db2'))
@@ -26,21 +27,31 @@ const createSsbServer = SecretStack({ caps })
   .use(require('ssb-index-feed-writer'))
   .use(require('../..'))
 
-const CONNECTION_TIMEOUT = 500 // ms
-const REPLICATION_TIMEOUT = 6000 // ms
-const INDEX_WRITING_TIMEOUT = 3000 // ms
+const CONNECTION_TIMEOUT = 1e3
+const INACTIVITY_TIMEOUT = 60e3
+const REPLICATION_TIMEOUT = 8e3
+const INDEX_WRITING_TIMEOUT = 3e3
 
-const aliceKeys = keysFor('alice')
-const bobKeys = keysFor('bob')
+const aliceKeys = u.keysFor('alice')
+const bobKeys = u.keysFor('bob')
+const carolKeys = u.keysFor('carol')
+let alice
+let bob
+let carol
+let connectionBA
+let connectionCA
+let connectionCB
 
 tape('setup', async (t) => {
   rimraf.sync(path.join(os.tmpdir(), 'server-alice'))
   rimraf.sync(path.join(os.tmpdir(), 'server-bob'))
+  rimraf.sync(path.join(os.tmpdir(), 'server-carol'))
 
-  const alice = createSsbServer({
+  alice = createSsbServer({
     path: path.join(os.tmpdir(), 'server-alice'),
     keys: aliceKeys,
     timeout: CONNECTION_TIMEOUT,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
     indexFeedWriter: {
       autostart: [
         { type: 'post', private: false },
@@ -49,9 +60,10 @@ tape('setup', async (t) => {
     },
   })
 
-  const bob = createSsbServer({
+  bob = createSsbServer({
     path: path.join(os.tmpdir(), 'server-bob'),
     keys: bobKeys,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
     timeout: CONNECTION_TIMEOUT,
   })
 
@@ -62,15 +74,14 @@ tape('setup', async (t) => {
   // Wait for all bots to be ready
   await sleep(500)
 
-  const following = true
   await Promise.all([
     // All peers publish a post
     pify(alice.db.publish)({ type: 'post', text: 'My name is Alice' }),
     pify(bob.db.publish)({ type: 'post', text: 'My name is Bob' }),
 
     // alice and bob follow each other
-    pify(alice.db.publish)({ type: 'contact', contact: bob.id, following }),
-    pify(bob.db.publish)({ type: 'contact', contact: alice.id, following }),
+    pify(alice.db.publish)(u.follow(bob.id)),
+    pify(bob.db.publish)(u.follow(alice.id)),
   ])
   t.pass('published all the messages')
 
@@ -83,10 +94,11 @@ tape('setup', async (t) => {
 })
 
 tape('alice writes index feeds and bob replicates them', async (t) => {
-  const alice = createSsbServer({
+  alice = createSsbServer({
     path: path.join(os.tmpdir(), 'server-alice'),
     keys: aliceKeys,
     timeout: CONNECTION_TIMEOUT,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
     indexFeedWriter: {
       autostart: [
         { type: 'post', private: false },
@@ -114,10 +126,11 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     },
   })
 
-  const bob = createSsbServer({
+  bob = createSsbServer({
     path: path.join(os.tmpdir(), 'server-bob'),
     keys: bobKeys,
     timeout: CONNECTION_TIMEOUT,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
     replicationScheduler: {
       partialReplication: {
         0: null,
@@ -141,7 +154,13 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     },
   })
 
-  const connectionBA = await pify(bob.connect)(alice.getAddress())
+  t.equals(
+    await alice.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    4, // add main + add indexes + add post index + add contact index
+    'alice has 4 bendybutt msgs'
+  )
+
+  connectionBA = await pify(bob.connect)(alice.getAddress())
   t.pass('peers are connected to each other')
 
   await sleep(REPLICATION_TIMEOUT)
@@ -199,6 +218,75 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     'bob has 1 metafeed/announce from alice'
   )
 
+  t.equals(
+    await bob.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    4, // add main + add indexes + add post index + add contact index
+    'bob replicated 4 bendybutt msgs'
+  )
+
+  await pify(connectionBA.close)(true)
+
+  t.end()
+})
+
+tape('carol acts as an intermediate between alice and bob', async (t) => {
+  carol = createSsbServer({
+    path: path.join(os.tmpdir(), 'server-carol'),
+    keys: carolKeys,
+    timeout: CONNECTION_TIMEOUT,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
+    friends: { hops: 2 },
+    replicationScheduler: {
+      partialReplication: {
+        0: null,
+        1: {
+          subfeeds: [
+            {
+              feedpurpose: 'indexes',
+              subfeeds: [
+                {
+                  feedpurpose: 'index',
+                  $format: 'indexed',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  })
+  t.pass('carol initialized')
+
+  // This needs to happen before publishing follows, otherwise carol
+  // defaults to normal replication (which means she won't replicate meta feeds)
+  connectionCA = await pify(carol.connect)(alice.getAddress())
+  t.pass('carol is connected to alice')
+
+  await pify(carol.db.publish)(u.follow(alice.id))
+  t.pass('carol follows alice')
+
+  await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await carol.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    4, // add main + add indexes + add post index + add contact index
+    'carol replicated 4 bendybutt msgs'
+  )
+
+  t.equals(
+    await carol.db.query(where(author(alice.id)), count(), toPromise()),
+    3, // post + contact + metafeed/announce
+    'carol replicated all of alices msgs'
+  )
+
+  connectionCB = await pify(carol.connect)(bob.getAddress())
+  t.pass('carol is connected to bob')
+
+  t.end()
+})
+
+tape('bob reconfigures to replicate everything from alice', async (t) => {
   bob.replicationScheduler.reconfigure({
     partialReplication: {
       0: null,
@@ -208,17 +296,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
             feedpurpose: 'indexes',
             subfeeds: [
               {
-                metadata: {
-                  querylang: 'ssb-ql-0',
-                  query: { author: '$main', type: 'post', private: false },
-                },
-                $format: 'indexed',
-              },
-              {
-                metadata: {
-                  querylang: 'ssb-ql-0',
-                  query: { author: '$main', type: 'contact', private: false },
-                },
+                feedpurpose: 'index',
                 $format: 'indexed',
               },
             ],
@@ -242,9 +320,108 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     'bob has 1 contact msgs from alice'
   )
 
-  await pify(connectionBA.close)(true)
+  t.end()
+})
 
-  await Promise.all([pify(alice.close)(true), pify(bob.close)(true)])
+tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
+  // FIXME: this disconnection and subsequent reconnection is only required
+  // because index writing is buggy because we still don't have transactions
+  // in ssb-db2. Once ssb-db2 is patched (and ssb-index-feed-writer), we can
+  // remove this disconnection+reconnection.
+  await pify(connectionCA.close)(true)
+  await pify(connectionCB.close)(true)
+  t.pass('close carols connections')
+
+  await pify(bob.db.publish)(u.block(alice.id))
+  t.pass('bob blocked alice')
+
+  await pify(alice.db.publish)({ type: 'post', text: 'Whatever' })
+  t.pass('alice published a new post')
+
+  const aliceRootMF = await pify(alice.metafeeds.find)()
+  await pify(alice.metafeeds.create)(aliceRootMF, {
+    feedpurpose: 'mygame',
+    feedformat: 'classic',
+    metadata: {
+      score: 0,
+      whateverElse: true,
+    },
+  })
+  t.pass('alice created a game subfeed')
+
+  connectionCA = await pify(carol.connect)(alice.getAddress())
+  connectionCB = await pify(carol.connect)(bob.getAddress())
+  t.pass('reset carols connections')
+
+  await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await alice.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    5, // add main + add indexes + add post index + add contact index + add game
+    'alice has 5 bendybutt msgs'
+  )
+
+  t.equals(
+    await bob.db.query(
+      where(and(type('post'), author(alice.id))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'bob has 1 post from alice'
+  )
+
+  t.equals(
+    await bob.db.query(
+      where(and(type('contact'), author(alice.id))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'bob has 1 contact msg from alice'
+  )
+
+  t.equals(
+    await bob.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    4, // add main + add indexes + add post index + add contact index
+    'bob replicated 4 bendybutt msgs'
+  )
+
+  t.end()
+})
+
+tape('once bob unblocks alice, he replicates her subfeeds', async (t) => {
+  await pify(bob.db.publish)(u.follow(alice.id))
+
+  await sleep(REPLICATION_TIMEOUT * 2)
+  t.pass('replication period is over')
+
+  t.equals(
+    await bob.db.query(
+      where(and(type('post'), author(alice.id))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'bob has 2 posts from alice'
+  )
+
+  t.equals(
+    await bob.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    5, // add main + add indexes + add post index + add contact index + add game
+    'bob replicated 5 bendybutt msgs'
+  )
+
+  t.end()
+})
+
+tape('teardown', async (t) => {
+  await Promise.all([
+    pify(alice.close)(true),
+    pify(bob.close)(true),
+    pify(carol.close)(true),
+  ])
 
   t.end()
 })

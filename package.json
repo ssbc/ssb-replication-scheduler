@@ -21,10 +21,11 @@
   "dependencies": {
     "debug": "^4.3.2",
     "pull-stream": "^3.6.0",
+    "ssb-db2": "^2.5.2",
+    "ssb-ebt": "ssbc/ssb-ebt#partial-replication-changes",
+    "ssb-meta-feeds": "ssb-ngi-pointer/ssb-meta-feeds#tree-api",
     "ssb-network-errors": "^1.0.0",
-    "ssb-ref": "^2.13.9",
-    "ssb-subset-ql": "~0.6.1",
-    "ssb-uri2": "^1.5.2"
+    "ssb-subset-ql": "~0.6.1"
   },
   "devDependencies": {
     "cat-names": "^3.0.0",
@@ -41,13 +42,10 @@
     "secret-stack": "^6.4.0",
     "ssb-caps": "^1.1.0",
     "ssb-db": "^20.4.0",
-    "ssb-db2": "^2.5.2",
-    "ssb-ebt": "ssbc/ssb-ebt#partial-replication-changes",
     "ssb-fixtures": "^2.5.3",
     "ssb-friends": "^5.1.0",
     "ssb-index-feed-writer": "~0.6.0",
     "ssb-keys": "^8.2.0",
-    "ssb-meta-feeds": "~0.22.1",
     "ssb-meta-feeds-rpc": "~0.2.0",
     "tap-spec": "^5.0.0",
     "tape": "^5.2.2"
