@@ -29,7 +29,7 @@ const createSsbServer = SecretStack({ caps })
 
 const CONNECTION_TIMEOUT = 1e3
 const INACTIVITY_TIMEOUT = 60e3
-const REPLICATION_TIMEOUT = 8e3
+const REPLICATION_TIMEOUT = 2e3
 const INDEX_WRITING_TIMEOUT = 3e3
 
 const aliceKeys = u.keysFor('alice')
@@ -103,6 +103,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
       ],
     },
     replicationScheduler: {
+      debouncePeriod: 1,
       partialReplication: {
         0: {
           subfeeds: [
@@ -129,6 +130,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     timers: { inactivity: INACTIVITY_TIMEOUT },
     replicationScheduler: {
+      debouncePeriod: 1,
       partialReplication: {
         0: null,
         1: {
@@ -234,6 +236,7 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
     timers: { inactivity: INACTIVITY_TIMEOUT },
     friends: { hops: 2 },
     replicationScheduler: {
+      debouncePeriod: 1,
       partialReplication: {
         0: null,
         1: {
