@@ -324,14 +324,6 @@ tape('bob reconfigures to replicate everything from alice', async (t) => {
 })
 
 tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
-  // FIXME: this disconnection and subsequent reconnection is only required
-  // because index writing is buggy because we still don't have transactions
-  // in ssb-db2. Once ssb-db2 is patched (and ssb-index-feed-writer), we can
-  // remove this disconnection+reconnection.
-  await pify(connectionCA.close)(true)
-  await pify(connectionCB.close)(true)
-  t.pass('close carols connections')
-
   await pify(bob.db.publish)(u.block(alice.id))
   t.pass('bob blocked alice')
 
@@ -348,10 +340,6 @@ tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
     },
   })
   t.pass('alice created a game subfeed')
-
-  connectionCA = await pify(carol.connect)(alice.getAddress())
-  connectionCB = await pify(carol.connect)(bob.getAddress())
-  t.pass('reset carols connections')
 
   await sleep(REPLICATION_TIMEOUT)
   t.pass('replication period is over')
