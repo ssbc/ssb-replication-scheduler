@@ -38,9 +38,6 @@ const carolKeys = u.keysFor('carol')
 let alice
 let bob
 let carol
-let connectionBA
-let connectionCA
-let connectionCB
 
 tape('setup', async (t) => {
   rimraf.sync(path.join(os.tmpdir(), 'server-alice'))
@@ -160,7 +157,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
     'alice has 4 bendybutt msgs'
   )
 
-  connectionBA = await pify(bob.connect)(alice.getAddress())
+  const connectionBA = await pify(bob.connect)(alice.getAddress())
   t.pass('peers are connected to each other')
 
   await sleep(REPLICATION_TIMEOUT)
@@ -259,7 +256,7 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
 
   // This needs to happen before publishing follows, otherwise carol
   // defaults to normal replication (which means she won't replicate meta feeds)
-  connectionCA = await pify(carol.connect)(alice.getAddress())
+  await pify(carol.connect)(alice.getAddress())
   t.pass('carol is connected to alice')
 
   await pify(carol.db.publish)(u.follow(alice.id))
@@ -280,7 +277,7 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
     'carol replicated all of alices msgs'
   )
 
-  connectionCB = await pify(carol.connect)(bob.getAddress())
+  await pify(carol.connect)(bob.getAddress())
   t.pass('carol is connected to bob')
 
   t.end()
