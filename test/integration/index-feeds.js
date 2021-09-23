@@ -23,7 +23,7 @@ const createSsbServer = SecretStack({ caps })
   .use(require('ssb-ebt'))
   .use(require('ssb-friends'))
   .use(require('ssb-meta-feeds'))
-  .use(require('ssb-meta-feeds-rpc'))
+  .use(require('ssb-subset-rpc'))
   .use(require('ssb-index-feed-writer'))
   .use(require('../..'))
 
