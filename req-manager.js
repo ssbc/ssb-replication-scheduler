@@ -60,6 +60,10 @@ module.exports = class RequestManager {
 
   reconfigure(opts) {
     this._opts = { ...this._opts, ...opts }
+    this._period =
+      typeof opts.debouncePeriod === 'number'
+        ? opts.debouncePeriod
+        : this._period
     this._templates = this._setupTemplates(this._opts.partialReplication)
     for (const [feedId, hops] of this._requested) {
       this._requestables.set(feedId, hops)
