@@ -31,11 +31,6 @@ exports.init = function (ssb, config) {
   const metafeedFinder = new MetafeedFinder(ssb, opts)
   const requestManager = new RequestManager(ssb, opts, metafeedFinder)
 
-  // Note: ssb.ebt.request and ssb.ebt.block are idempotent operations,
-  // so it's safe to call these methods redundantly, which is most likely
-  // true in most cases. These three blocks below may sometimes overlap, but
-  // that's okay, as long as we cover *all* cases.
-
   // Replicate myself ASAP, without request manager
   ssb.ebt.request(ssb.id, true)
 
@@ -45,13 +40,9 @@ exports.init = function (ssb, config) {
     pull.drain((graph) => {
       for (const source of Object.keys(graph)) {
         for (const dest of Object.keys(graph[source])) {
-          const value = graph[source][dest]
-          // Only if I am the `source` and `value >= 0`, request replication
-          if (source === ssb.id) {
-            requestManager.add(dest, value)
-          }
           // Compute every block edge unrelated to me
           if (source !== ssb.id && dest !== ssb.id) {
+            const value = graph[source][dest]
             ssb.ebt.block(source, dest, value === -1)
           }
         }
