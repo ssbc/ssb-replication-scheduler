@@ -11,9 +11,9 @@ module.exports = class MetafeedFinder {
     this._ssb = ssb
     this._opts = opts
     this._period = period || DEFAULT_PERIOD
-    this._map = new Map()
-    this._inverseMap = new Map()
-    this._requestsByMainfeedId = new Map()
+    this._map = new Map() // mainFeedId => rootMetaFeedId
+    this._inverseMap = new Map() // rootMetaFeedId => mainFeedId
+    this._requestsByMainfeedId = new Map() // mainFeedId => Array<Calback>
     this._latestRequestTime = 0
     this._timer = null
 

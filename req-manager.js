@@ -3,7 +3,7 @@ const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
 const Template = require('./template')
 
-const DEFAULT_PERIOD = 150
+const DEFAULT_PERIOD = 150 // ms
 
 module.exports = class RequestManager {
   constructor(ssb, opts, metafeedFinder) {
