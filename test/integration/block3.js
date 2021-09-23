@@ -4,7 +4,6 @@
 
 const tape = require('tape')
 const crypto = require('crypto')
-const ssbKeys = require('ssb-keys')
 const pify = require('promisify-4loc')
 const sleep = require('util').promisify(setTimeout)
 const SecretStack = require('secret-stack')
@@ -32,7 +31,7 @@ const REPLICATION_TIMEOUT = 2 * CONNECTION_TIMEOUT
 const alice = createSsbServer({
   temp: 'test-block3-alice',
   timeout: CONNECTION_TIMEOUT,
-  keys: ssbKeys.generate(),
+  keys: u.keysFor('alice'),
   replicationScheduler: {
     debouncePeriod: 0,
   },
@@ -41,7 +40,8 @@ const alice = createSsbServer({
 const bob = createSsbServer({
   temp: 'test-block3-bob',
   timeout: CONNECTION_TIMEOUT,
-  keys: ssbKeys.generate(),
+  keys: u.keysFor('bob'),
+  ebt: {logging: true},
   replicationScheduler: {
     debouncePeriod: 0,
   },
@@ -50,7 +50,7 @@ const bob = createSsbServer({
 const carol = createSsbServer({
   temp: 'test-block3-carol',
   timeout: CONNECTION_TIMEOUT,
-  keys: ssbKeys.generate(),
+  keys: u.keysFor('carol'),
   replicationScheduler: {
     debouncePeriod: 0,
   },
@@ -66,7 +66,7 @@ tape('alice blocks bob and both are connected to carla', async (t) => {
     pify(carol.publish)(u.follow(alice.id)),
   ])
 
-  await Promise.all([
+  const [bc, ca] = await Promise.all([
     pify(bob.connect)(carol.getAddress()),
     pify(carol.connect)(alice.getAddress()),
   ])
@@ -79,7 +79,14 @@ tape('alice blocks bob and both are connected to carla', async (t) => {
 
   const clockBob = await pify(bob.getVectorClock)()
 
+  // FIXME: this disconnection followed by a re-connection is a hack
+  // to bypass a race condition in ssb-ebt where it doesn't wait for
+  // ssb-friends to compute changes to the social graph,
+  await pify(bc.close)(true)
+
   await pify(alice.publish)(u.block(bob.id))
+
+  await pify(bob.connect)(carol.getAddress())
 
   await sleep(REPLICATION_TIMEOUT)
 
