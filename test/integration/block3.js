@@ -41,7 +41,6 @@ const bob = createSsbServer({
   temp: 'test-block3-bob',
   timeout: CONNECTION_TIMEOUT,
   keys: u.keysFor('bob'),
-  ebt: {logging: true},
   replicationScheduler: {
     debouncePeriod: 0,
   },
