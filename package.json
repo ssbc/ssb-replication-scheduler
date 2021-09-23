@@ -23,7 +23,7 @@
     "pull-stream": "^3.6.0",
     "ssb-db2": "^2.5.2",
     "ssb-ebt": "ssbc/ssb-ebt#partial-replication-changes",
-    "ssb-meta-feeds": "ssb-ngi-pointer/ssb-meta-feeds#tree-api",
+    "ssb-meta-feeds": "~0.23.0",
     "ssb-network-errors": "^1.0.0",
     "ssb-subset-ql": "~0.6.1"
   },
