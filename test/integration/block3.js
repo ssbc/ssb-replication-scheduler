@@ -65,7 +65,7 @@ tape('alice blocks bob and both are connected to carla', async (t) => {
     pify(carol.publish)(u.follow(alice.id)),
   ])
 
-  const [bc, ca] = await Promise.all([
+  await Promise.all([
     pify(bob.connect)(carol.getAddress()),
     pify(carol.connect)(alice.getAddress()),
   ])
@@ -78,14 +78,7 @@ tape('alice blocks bob and both are connected to carla', async (t) => {
 
   const clockBob = await pify(bob.getVectorClock)()
 
-  // FIXME: this disconnection followed by a re-connection is a hack
-  // to bypass a race condition in ssb-ebt where it doesn't wait for
-  // ssb-friends to compute changes to the social graph,
-  await pify(bc.close)(true)
-
   await pify(alice.publish)(u.block(bob.id))
-
-  await pify(bob.connect)(carol.getAddress())
 
   await sleep(REPLICATION_TIMEOUT)
 
