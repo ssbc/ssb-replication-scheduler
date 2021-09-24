@@ -108,6 +108,7 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
         0: {
           subfeeds: [
             { feedpurpose: 'main' },
+            { feedpurpose: 'mygame' },
             {
               feedpurpose: 'indexes',
               subfeeds: [
@@ -241,6 +242,7 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
         0: null,
         1: {
           subfeeds: [
+            { feedpurpose: 'mygame' },
             {
               feedpurpose: 'indexes',
               subfeeds: [
@@ -286,7 +288,7 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
   t.end()
 })
 
-tape('bob reconfigures to replicate everything from alice', async (t) => {
+tape('bob reconfigures to replicate all indexes from alice', async (t) => {
   bob.replicationScheduler.reconfigure({
     partialReplication: {
       0: null,
@@ -323,6 +325,8 @@ tape('bob reconfigures to replicate everything from alice', async (t) => {
   t.end()
 })
 
+let gameFeed
+
 tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
   await pify(bob.db.publish)(u.block(alice.id))
   t.pass('bob blocked alice')
@@ -331,7 +335,7 @@ tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
   t.pass('alice published a new post')
 
   const aliceRootMF = await pify(alice.metafeeds.find)()
-  await pify(alice.metafeeds.create)(aliceRootMF, {
+  gameFeed = await pify(alice.metafeeds.create)(aliceRootMF, {
     feedpurpose: 'mygame',
     feedformat: 'classic',
     metadata: {
@@ -340,6 +344,12 @@ tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
     },
   })
   t.pass('alice created a game subfeed')
+
+  await pify(alice.db.publishAs)(gameFeed.keys, {
+    type: 'game',
+    move: { x: 1, y: 0 },
+  })
+  t.pass('alice published something on the game subfeed')
 
   await sleep(REPLICATION_TIMEOUT)
   t.pass('replication period is over')
@@ -376,6 +386,12 @@ tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
     'bob replicated 4 bendybutt msgs'
   )
 
+  t.equals(
+    await bob.db.query(where(type('game')), count(), toPromise()),
+    0,
+    'bob has not replicated the game subfeed'
+  )
+
   t.end()
 })
 
@@ -400,6 +416,45 @@ tape('once bob unblocks alice, he replicates her subfeeds', async (t) => {
     5, // add main + add indexes + add post index + add contact index + add game
     'bob replicated 5 bendybutt msgs'
   )
+
+  t.end()
+})
+
+tape('bob reconfigures to replicate a game feed from alice', async (t) => {
+  bob.replicationScheduler.reconfigure({
+    partialReplication: {
+      0: null,
+      1: {
+        subfeeds: [
+          {
+            feedpurpose: 'mygame',
+          },
+          {
+            feedpurpose: 'indexes',
+            subfeeds: [
+              {
+                feedpurpose: 'index',
+                $format: 'indexed',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  t.pass('reconfigure bob')
+
+  await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await bob.db.query(where(type('game')), count(), toPromise()),
+    1,
+    'bob has replicated the game subfeed'
+  )
+
+  const bobClock = await pify(bob.getVectorClock)()
+  t.equals(bobClock[gameFeed.keys.id], 1, 'bob\'s clock has the game feed')
 
   t.end()
 })
