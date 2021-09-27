@@ -380,9 +380,9 @@ module.exports = class RequestManager {
           }
         },
         (err) => {
+          this._flushing = false
           if (err) console.error(err)
           if (this._templates) this._scanBendyButtFeeds()
-          this._flushing = false
           if (this._wantsMoreFlushing) {
             this._scheduleDebouncedFlush()
           }
