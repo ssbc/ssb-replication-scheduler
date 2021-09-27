@@ -1,4 +1,5 @@
 const pull = require('pull-stream')
+const debug = require('debug')('ssb:replication-scheduler')
 const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
 const Template = require('./template')
@@ -229,6 +230,7 @@ module.exports = class RequestManager {
   _requestPartially(feedId) {
     if (this._requestedPartially.has(feedId)) return
     if (!this._requestables.has(feedId)) return
+    debug('will process %s for partial replication', feedId)
 
     const hops = this._getCurrentHops(feedId)
     this._requestedPartially.set(feedId, hops)
@@ -261,19 +263,21 @@ module.exports = class RequestManager {
 
   _request(feedId, hops = null, ebtFormat = undefined) {
     if (this._requested.has(feedId)) return
+    debug('will replicate %s', feedId)
 
     if (this._requestables.has(feedId)) {
       hops = this._requestables.get(feedId)
       this._requestables.delete(feedId)
     }
     this._requested.set(feedId, hops)
-
     this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
     this._ssb.ebt.request(feedId, true, ebtFormat)
   }
 
   _unrequest(feedId, ebtFormat = undefined) {
     if (this._unrequested.has(feedId)) return
+    debug('will stop replicating %s', feedId)
+
     const hops = this._getCurrentHops(feedId)
     this._requestables.delete(feedId)
     this._requested.delete(feedId)
@@ -296,6 +300,8 @@ module.exports = class RequestManager {
 
   _block(feedId, ebtFormat = undefined) {
     if (this._blocked.has(feedId)) return
+    debug('will block replication of %s', feedId)
+
     const hops = this._getCurrentHops(feedId)
     this._requestables.delete(feedId)
     this._requested.delete(feedId)
