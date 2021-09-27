@@ -1,5 +1,6 @@
 const pull = require('pull-stream')
 const debug = require('debug')('ssb:replication-scheduler')
+const pushable = require('pull-pushable')
 const detectSsbNetworkErrorSeverity = require('ssb-network-errors')
 const { where, type, live, toPullStream } = require('ssb-db2/operators')
 const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
@@ -16,6 +17,7 @@ module.exports = class MetafeedFinder {
     this._requestsByMainfeedId = new Map() // mainFeedId => Array<Calback>
     this._latestRequestTime = 0
     this._timer = null
+    this._liveStream = pushable()
 
     // If at least one hops template is configured, then load
     if (
@@ -60,20 +62,7 @@ module.exports = class MetafeedFinder {
   }
 
   liveStream() {
-    return pull(
-      this._ssb.db.query(
-        where(type('metafeed/announce')),
-        live(),
-        toPullStream()
-      ),
-      pull.filter(this._validateMetafeedAnnounce),
-      pull.map((msg) => {
-        const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg.value)
-        this._map.set(mainFeedId, metaFeedId)
-        this._inverseMap.set(metaFeedId, mainFeedId)
-        return [mainFeedId, metaFeedId]
-      })
-    )
+    return this._liveStream
   }
 
   _loadAllFromLog() {
@@ -82,17 +71,31 @@ module.exports = class MetafeedFinder {
       pull.filter(this._validateMetafeedAnnounce),
       pull.drain(
         (msg) => {
-          const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg.value)
-          this._map.set(mainFeedId, metaFeedId)
-          this._inverseMap.set(metaFeedId, mainFeedId)
+          this._updateMapsFromMsgValue(msg.value)
         },
         () => {
           debug(
             'loaded Map of all known main=>rootMF from disk, total %d',
             this._map.size
           )
+          this._startLiveStream()
         }
       )
+    )
+  }
+
+  _startLiveStream() {
+    pull(
+      this._ssb.db.query(
+        where(type('metafeed/announce')),
+        live(),
+        toPullStream()
+      ),
+      pull.filter(this._validateMetafeedAnnounce),
+      pull.drain((msg) => {
+        this._updateMapsFromMsgValue(msg.value)
+        this._liveStream.push(this._pluckFromAnnounceMsg(msg.value))
+      })
     )
   }
 
@@ -110,6 +113,12 @@ module.exports = class MetafeedFinder {
     const mainFeedId = msgVal.author
     const metaFeedId = msgVal.content.metafeed
     return [mainFeedId, metaFeedId]
+  }
+
+  _updateMapsFromMsgValue(msgVal) {
+    const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
+    this._map.set(mainFeedId, metaFeedId)
+    this._inverseMap.set(metaFeedId, mainFeedId)
   }
 
   _request(mainFeedId, cb) {
@@ -183,10 +192,9 @@ module.exports = class MetafeedFinder {
         pull.filter((value) => this._validateMetafeedAnnounce({ value })),
         (drainer = pull.drain(
           (msgVal) => {
+            this._updateMapsFromMsgValue(msgVal)
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
             if (requests.has(mainFeedId)) {
-              this._map.set(mainFeedId, metaFeedId)
-              this._inverseMap.set(metaFeedId, mainFeedId)
               this._persist(msgVal)
               const callbacks = requests.get(mainFeedId)
               requests.delete(mainFeedId)

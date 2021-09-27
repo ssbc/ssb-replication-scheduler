@@ -25,6 +25,7 @@ module.exports = class RequestManager {
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
+    this._oldBranchDrainer = null
     this._liveBranchDrainer = null
     this._liveFinderDrainer = null
     this._hasCloseHook = false
@@ -76,10 +77,9 @@ module.exports = class RequestManager {
       this._requestables.set(feedId, hops)
       this._requestedPartially.delete(feedId)
     }
-    if (this._liveBranchDrainer) this._liveBranchDrainer.abort()
-    this._liveBranchDrainer = null
-    if (this._liveFinderDrainer) this._liveFinderDrainer.abort()
-    this._liveFinderDrainer = null
+    // Refresh only the old branches stream drainer, not the live streams
+    if (this._oldBranchDrainer) this._oldBranchDrainer.abort()
+    this._oldBranchDrainer = null
     this._flush()
   }
 
@@ -116,6 +116,7 @@ module.exports = class RequestManager {
     this._hasCloseHook = true
     const that = this
     this._ssb.close.hook(function (fn, args) {
+      if (that._oldBranchDrainer) that._oldBranchDrainer.abort()
       if (that._liveBranchDrainer) that._liveBranchDrainer.abort()
       if (that._liveFinderDrainer) that._liveFinderDrainer.abort()
       fn.apply(this, args)
@@ -133,39 +134,53 @@ module.exports = class RequestManager {
     return null
   }
 
-  _drainLiveStreams() {
-    if (this._liveBranchDrainer) return
+  _setupStreamDrainers() {
     if (!this._hasCloseHook) this._setupCloseHook()
 
-    pull(
-      this._ssb.metafeeds.branchStream({ old: true, live: true }),
-      (this._liveBranchDrainer = pull.drain((branch) => {
-        const metaFeedId = branch[0][0]
-        const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-        this._handleBranch(branch, mainFeedId)
-      }))
-    )
+    if (!this._oldBranchDrainer) {
+      pull(
+        this._ssb.metafeeds.branchStream({ old: true, live: false }),
+        (this._oldBranchDrainer = pull.drain((branch) => {
+          const metaFeedId = branch[0][0]
+          const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+          this._handleBranch(branch, mainFeedId)
+        }))
+      )
+    }
+
+    if (!this._liveBranchDrainer) {
+      pull(
+        this._ssb.metafeeds.branchStream({ old: false, live: true }),
+        (this._liveBranchDrainer = pull.drain((branch) => {
+          const metaFeedId = branch[0][0]
+          const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+          this._handleBranch(branch, mainFeedId)
+        }))
+      )
+    }
 
     // Automatically switch to partial replication if (while replicating fully)
     // we bump into a metafeed/announce msg
-    pull(
-      this._metafeedFinder.liveStream(),
-      (this._liveFinderDrainer = pull.drain(([mainFeedId, metaFeedId]) => {
-        if (
-          this._requested.has(mainFeedId) &&
-          !this._requestedPartially.has(metaFeedId)
-        ) {
-          debug(
-            'switch from full replication to partial replication for %s',
-            mainFeedId
-          )
-          const hops = this._requested.get(mainFeedId)
-          this._unrequest(mainFeedId)
-          this._requestables.set(mainFeedId, hops)
-          this._requestPartially(mainFeedId)
-        }
-      }))
-    )
+    if (!this._liveFinderDrainer) {
+      pull(
+        this._metafeedFinder.liveStream(),
+        (this._liveFinderDrainer = pull.drain(([mainFeedId, metaFeedId]) => {
+          if (
+            this._requested.has(mainFeedId) &&
+            !this._requestedPartially.has(metaFeedId)
+          ) {
+            debug(
+              'switch from full replication to partial replication for %s',
+              mainFeedId
+            )
+            const hops = this._requested.get(mainFeedId)
+            this._unrequest(mainFeedId)
+            this._requestables.set(mainFeedId, hops)
+            this._requestPartially(mainFeedId)
+          }
+        }))
+      )
+    }
 
     // FIXME: pull tombstoneBranchStream and do ssb.ebt.request(tombId, false)
   }
@@ -382,7 +397,7 @@ module.exports = class RequestManager {
         (err) => {
           this._flushing = false
           if (err) console.error(err)
-          if (this._templates) this._drainLiveStreams()
+          if (this._templates) this._setupStreamDrainers()
           if (this._wantsMoreFlushing) {
             this._scheduleDebouncedFlush()
           }
