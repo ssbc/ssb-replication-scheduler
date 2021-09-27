@@ -29,7 +29,7 @@ const createSsbServer = SecretStack({ caps })
 
 const CONNECTION_TIMEOUT = 1e3
 const INACTIVITY_TIMEOUT = 60e3
-const REPLICATION_TIMEOUT = 2e3
+const REPLICATION_TIMEOUT = 4e3
 const INDEX_WRITING_TIMEOUT = 3e3
 
 const aliceKeys = u.keysFor('alice')
@@ -264,8 +264,11 @@ tape('carol acts as an intermediate between alice and bob', async (t) => {
   await pify(carol.connect)(alice.getAddress())
   t.pass('carol is connected to alice')
 
-  await pify(carol.db.publish)(u.follow(alice.id))
-  t.pass('carol follows alice')
+  await Promise.all([
+    pify(carol.db.publish)(u.follow(alice.id)),
+    pify(carol.db.publish)(u.follow(bob.id)),
+  ])
+  t.pass('carol follows alice and bob')
 
   await sleep(REPLICATION_TIMEOUT)
   t.pass('replication period is over')
@@ -423,7 +426,74 @@ tape('once bob unblocks alice, he replicates her subfeeds', async (t) => {
 tape('bob reconfigures to replicate a game feed from alice', async (t) => {
   bob.replicationScheduler.reconfigure({
     partialReplication: {
-      0: null,
+      0: {
+        subfeeds: [
+          { feedpurpose: 'main' },
+          {
+            feedpurpose: 'indexes',
+            subfeeds: [
+              {
+                feedpurpose: 'index',
+                $format: 'indexed',
+              },
+            ],
+          },
+        ],
+      },
+      /**/
+
+      1: {
+        subfeeds: [
+          { feedpurpose: 'mygame' },
+          {
+            feedpurpose: 'indexes',
+            subfeeds: [
+              {
+                feedpurpose: 'index',
+                $format: 'indexed',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  t.pass('reconfigure bob')
+
+  await sleep(3 * REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await bob.db.query(where(type('game')), count(), toPromise()),
+    1,
+    'bob has replicated the game subfeed'
+  )
+
+  const bobClock = await pify(bob.getVectorClock)()
+  t.equals(bobClock[gameFeed.keys.id], 1, "bob's clock has the game feed")
+
+  t.end()
+})
+
+tape('bob starts a root meta feed and indexes, alice replicates', async (t) => {
+  alice.replicationScheduler.reconfigure({
+    partialReplication: {
+      0: {
+        subfeeds: [
+          { feedpurpose: 'main' },
+          { feedpurpose: 'mygame' },
+          {
+            feedpurpose: 'indexes',
+            subfeeds: [
+              {
+                feedpurpose: 'index',
+                $format: 'indexed',
+              },
+            ],
+          },
+        ],
+      },
+
       1: {
         subfeeds: [
           {
@@ -442,19 +512,33 @@ tape('bob reconfigures to replicate a game feed from alice', async (t) => {
       },
     },
   })
-  t.pass('reconfigure bob')
+  t.pass('reconfigure alice to partially replicate friends')
 
-  await sleep(REPLICATION_TIMEOUT)
+  // wait a bit so that alice is still replicating bob fully
+  await sleep(1000)
+
+  await pify(bob.indexFeedWriter.start)({
+    author: bob.id,
+    type: 'post',
+    private: false,
+  })
+  await pify(bob.indexFeedWriter.start)({
+    author: bob.id,
+    type: 'contact',
+    private: false,
+  })
+
+  await sleep(INDEX_WRITING_TIMEOUT)
+  t.pass('waited for Bob to publish meta feed msgs')
+
+  await sleep(REPLICATION_TIMEOUT * 2)
   t.pass('replication period is over')
 
   t.equals(
-    await bob.db.query(where(type('game')), count(), toPromise()),
-    1,
-    'bob has replicated the game subfeed'
+    await alice.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    9, // 5 + add main + add indexes + add post index + add contact index
+    'alice replicated 9 bendybutt msgs'
   )
-
-  const bobClock = await pify(bob.getVectorClock)()
-  t.equals(bobClock[gameFeed.keys.id], 1, 'bob\'s clock has the game feed')
 
   t.end()
 })

@@ -24,6 +24,8 @@ module.exports = class RequestManager {
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
+    this._liveDrainer = null
+    this._liveDrainer2 = null
     this._hasCloseHook = false
     this._templates = this._setupTemplates(this._opts.partialReplication)
 
@@ -75,6 +77,8 @@ module.exports = class RequestManager {
     }
     if (this._liveDrainer) this._liveDrainer.abort()
     this._liveDrainer = null
+    if (this._liveDrainer2) this._liveDrainer2.abort()
+    this._liveDrainer2 = null
     this._flush()
   }
 
@@ -112,17 +116,20 @@ module.exports = class RequestManager {
     const that = this
     this._ssb.close.hook(function (fn, args) {
       if (that._liveDrainer) that._liveDrainer.abort()
+      if (that._liveDrainer2) that._liveDrainer2.abort()
       fn.apply(this, args)
     })
   }
 
   _getCurrentHops(feedId) {
-    return (
-      this._requestables.get(feedId) ||
-      this._requested.get(feedId) ||
-      this._requestedPartially.get(feedId) ||
-      null
-    )
+    let h
+    h = this._requestables.get(feedId)
+    if (typeof h === 'number') return h
+    h = this._requested.get(feedId)
+    if (typeof h === 'number') return h
+    h = this._requestedPartially.get(feedId)
+    if (typeof h === 'number') return h
+    return null
   }
 
   _scanBendyButtFeeds() {
@@ -135,6 +142,27 @@ module.exports = class RequestManager {
         const metaFeedId = branch[0][0]
         const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
         this._handleBranch(branch, mainFeedId)
+      }))
+    )
+
+    // Automatically switch to partial replication if (while replicating fully)
+    // we bump into a metafeed/announce msg
+    pull(
+      this._metafeedFinder.liveStream(),
+      (this._liveDrainer2 = pull.drain(([mainFeedId, metaFeedId]) => {
+        if (
+          this._requested.has(mainFeedId) &&
+          !this._requestedPartially.has(metaFeedId)
+        ) {
+          debug(
+            'switch from full replication to partial replication for %s',
+            mainFeedId
+          )
+          const hops = this._requested.get(mainFeedId)
+          this._unrequest(mainFeedId)
+          this._requestables.set(mainFeedId, hops)
+          this._requestPartially(mainFeedId)
+        }
       }))
     )
 
@@ -155,7 +183,7 @@ module.exports = class RequestManager {
       const hops = this._requestedPartially.get(mainFeedId)
       const matchedNode = this._matchBranchWith(hops, branch, mainFeedId)
       if (!matchedNode) return
-      this._request(subfeed, matchedNode['$format'])
+      this._request(subfeed, hops, matchedNode['$format'])
       return
     }
 
@@ -186,14 +214,14 @@ module.exports = class RequestManager {
     }
   }
 
-  _fetchAndRequestMetafeed(feedId) {
+  _fetchAndRequestMetafeed(feedId, hops) {
     this._metafeedFinder.fetch(feedId, (err, metafeedId) => {
       if (err) {
         console.error(err)
       } else if (!metafeedId) {
         console.error('cannot partially replicate ' + feedId)
       } else {
-        this._request(metafeedId)
+        this._request(metafeedId, hops)
       }
     })
   }
@@ -202,7 +230,7 @@ module.exports = class RequestManager {
     if (this._requestedPartially.has(feedId)) return
     if (!this._requestables.has(feedId)) return
 
-    const hops = this._requestables.get(feedId)
+    const hops = this._getCurrentHops(feedId)
     this._requestedPartially.set(feedId, hops)
     this._requestables.delete(feedId)
 
@@ -219,7 +247,7 @@ module.exports = class RequestManager {
           },
           () => {
             if (branchesFound === false) {
-              this._fetchAndRequestMetafeed(feedId)
+              this._fetchAndRequestMetafeed(feedId, hops)
             }
           }
         )
@@ -227,20 +255,19 @@ module.exports = class RequestManager {
     }
     // Fetch metafeedId for this (main) feedId for the first time
     else {
-      this._fetchAndRequestMetafeed(feedId)
+      this._fetchAndRequestMetafeed(feedId, hops)
     }
   }
 
-  _request(feedId, ebtFormat = undefined) {
+  _request(feedId, hops = null, ebtFormat = undefined) {
     if (this._requested.has(feedId)) return
 
     if (this._requestables.has(feedId)) {
-      const hops = this._requestables.get(feedId)
-      this._requested.set(feedId, hops)
+      hops = this._requestables.get(feedId)
       this._requestables.delete(feedId)
-    } else {
-      this._requested.set(feedId, null)
     }
+    this._requested.set(feedId, hops)
+
     this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
     this._ssb.ebt.request(feedId, true, ebtFormat)
   }

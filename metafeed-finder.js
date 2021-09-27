@@ -1,7 +1,7 @@
 const pull = require('pull-stream')
 const debug = require('debug')('ssb:replication-scheduler')
 const detectSsbNetworkErrorSeverity = require('ssb-network-errors')
-const { where, type, toPullStream } = require('ssb-db2/operators')
+const { where, type, live, toPullStream } = require('ssb-db2/operators')
 const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 
 const DEFAULT_PERIOD = 500
@@ -22,6 +22,11 @@ module.exports = class MetafeedFinder {
       this._opts.partialReplication &&
       Object.values(this._opts.partialReplication).some((templ) => !!templ)
     ) {
+      if (!this._ssb.db || !this._ssb.db.query) {
+        throw new Error(
+          'ssb-replication-scheduler expects ssb-db2 to be installed, to use partial replication'
+        )
+      }
       this._loadAllFromLog()
     }
   }
@@ -57,13 +62,24 @@ module.exports = class MetafeedFinder {
     return this._inverseMap.get(metaFeedId)
   }
 
-  _loadAllFromLog() {
-    if (!this._ssb.db || !this._ssb.db.query) {
-      throw new Error(
-        'ssb-replication-scheduler expects ssb-db2 to be installed, to use partial replication'
-      )
-    }
+  liveStream() {
+    return pull(
+      this._ssb.db.query(
+        where(type('metafeed/announce')),
+        live(),
+        toPullStream()
+      ),
+      pull.filter(this._validateMetafeedAnnounce),
+      pull.map((msg) => {
+        const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msg.value)
+        this._map.set(mainFeedId, metaFeedId)
+        this._inverseMap.set(metaFeedId, mainFeedId)
+        return [mainFeedId, metaFeedId]
+      })
+    )
+  }
 
+  _loadAllFromLog() {
     pull(
       this._ssb.db.query(where(type('metafeed/announce')), toPullStream()),
       pull.filter(this._validateMetafeedAnnounce),
