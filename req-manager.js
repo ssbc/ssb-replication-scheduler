@@ -25,8 +25,8 @@ module.exports = class RequestManager {
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
-    this._liveDrainer = null
-    this._liveDrainer2 = null
+    this._liveBranchDrainer = null
+    this._liveFinderDrainer = null
     this._hasCloseHook = false
     this._templates = this._setupTemplates(this._opts.partialReplication)
 
@@ -76,10 +76,10 @@ module.exports = class RequestManager {
       this._requestables.set(feedId, hops)
       this._requestedPartially.delete(feedId)
     }
-    if (this._liveDrainer) this._liveDrainer.abort()
-    this._liveDrainer = null
-    if (this._liveDrainer2) this._liveDrainer2.abort()
-    this._liveDrainer2 = null
+    if (this._liveBranchDrainer) this._liveBranchDrainer.abort()
+    this._liveBranchDrainer = null
+    if (this._liveFinderDrainer) this._liveFinderDrainer.abort()
+    this._liveFinderDrainer = null
     this._flush()
   }
 
@@ -116,8 +116,8 @@ module.exports = class RequestManager {
     this._hasCloseHook = true
     const that = this
     this._ssb.close.hook(function (fn, args) {
-      if (that._liveDrainer) that._liveDrainer.abort()
-      if (that._liveDrainer2) that._liveDrainer2.abort()
+      if (that._liveBranchDrainer) that._liveBranchDrainer.abort()
+      if (that._liveFinderDrainer) that._liveFinderDrainer.abort()
       fn.apply(this, args)
     })
   }
@@ -133,13 +133,13 @@ module.exports = class RequestManager {
     return null
   }
 
-  _scanBendyButtFeeds() {
-    if (this._liveDrainer) return
+  _drainLiveStreams() {
+    if (this._liveBranchDrainer) return
     if (!this._hasCloseHook) this._setupCloseHook()
 
     pull(
       this._ssb.metafeeds.branchStream({ old: true, live: true }),
-      (this._liveDrainer = pull.drain((branch) => {
+      (this._liveBranchDrainer = pull.drain((branch) => {
         const metaFeedId = branch[0][0]
         const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
         this._handleBranch(branch, mainFeedId)
@@ -150,7 +150,7 @@ module.exports = class RequestManager {
     // we bump into a metafeed/announce msg
     pull(
       this._metafeedFinder.liveStream(),
-      (this._liveDrainer2 = pull.drain(([mainFeedId, metaFeedId]) => {
+      (this._liveFinderDrainer = pull.drain(([mainFeedId, metaFeedId]) => {
         if (
           this._requested.has(mainFeedId) &&
           !this._requestedPartially.has(metaFeedId)
@@ -382,7 +382,7 @@ module.exports = class RequestManager {
         (err) => {
           this._flushing = false
           if (err) console.error(err)
-          if (this._templates) this._scanBendyButtFeeds()
+          if (this._templates) this._drainLiveStreams()
           if (this._wantsMoreFlushing) {
             this._scheduleDebouncedFlush()
           }
