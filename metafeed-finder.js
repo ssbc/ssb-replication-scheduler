@@ -35,14 +35,11 @@ module.exports = class MetafeedFinder {
     if (this._map.has(mainFeedId)) {
       const metaFeedId = this._map.get(mainFeedId)
       cb(null, metaFeedId)
-      return
     } else if (mainFeedId === this._ssb.id) {
       this._ssb.metafeeds.find((err, rootMF) => {
-        if (err) {
-          return cb(err)
-        } else if (!rootMF) {
-          cb(null, null)
-        } else {
+        if (err) cb(err)
+        else if (!rootMF) cb(null, null)
+        else {
           const metaFeedId = rootMF.keys.id
           this._map.set(mainFeedId, metaFeedId)
           this._inverseMap.set(metaFeedId, mainFeedId)
