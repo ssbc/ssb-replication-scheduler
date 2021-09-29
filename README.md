@@ -58,6 +58,10 @@ depending whether the feed is friendly or blocked.
 - Replication is strictly disabled for:
   - Any feed you explicitly block
 
+There are two APIs available in case you want to have more control over this
+module: `start()` and `reconfigure()`. Read more about these at the bottom of
+this file.
+
 ## Configuration
 
 Some parameters and opinions can be configured by the user or by application
@@ -67,6 +71,13 @@ object. The possible options are listed below:
 ```js
 {
   replicationScheduler: {
+    /**
+     * Whether the replication scheduler should start automatically as soon as
+     * the SSB app is initialized. When `false`, you have to call
+     * `ssb.replicationScheduler.start()` manually. Default is `true`.
+     */
+    autostart: true,
+
     /**
      * If `partialReplication` is an object, it tells the replication scheduler
      * to perform partial replication, whenever remote feeds support it. If
@@ -285,9 +296,12 @@ partialReplication: {
 }
 ```
 
-## muxrpc APIs
+## APIs
 
-### `ssb.replicationScheduler.reconfigure(config) => void`
+### `ssb.replicationScheduler.start() => void` (sync)
+
+
+### `ssb.replicationScheduler.reconfigure(config) => void` (sync)
 
 At any point during the execution of your program, you can reconfigure the
 replication rules using this API. The configuration object passed to this API

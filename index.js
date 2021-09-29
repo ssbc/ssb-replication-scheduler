@@ -8,6 +8,7 @@ const RequestManager = require('./req-manager')
 
 const DEFAULT_OPTS = {
   partialReplication: null,
+  autostart: true,
 }
 
 exports.name = 'replicationScheduler'
@@ -27,42 +28,54 @@ exports.init = function (ssb, config) {
   }
 
   const opts = config.replicationScheduler || DEFAULT_OPTS
-
   const metafeedFinder = new MetafeedFinder(ssb, opts)
   const requestManager = new RequestManager(ssb, opts, metafeedFinder)
+  let started = false
 
-  // Replicate myself ASAP, without request manager
-  ssb.ebt.request(ssb.id, true)
+  if (opts.autostart === true || typeof opts.autostart === 'undefined') {
+    start()
+  }
 
-  // For each edge in the social graph, call either `request` or `block`
-  pull(
-    ssb.friends.graphStream({ old: true, live: true }),
-    pull.drain((graph) => {
-      for (const source of Object.keys(graph)) {
-        for (const dest of Object.keys(graph[source])) {
-          // Compute every block edge unrelated to me
-          if (source !== ssb.id && dest !== ssb.id) {
-            const value = graph[source][dest]
-            ssb.ebt.block(source, dest, value === -1)
+  function start() {
+    if (started) return
+    started = true
+
+    // Replicate myself ASAP, without request manager
+    ssb.ebt.request(ssb.id, true)
+
+    // For each edge in the social graph, call either `request` or `block`
+    pull(
+      ssb.friends.graphStream({ old: true, live: true }),
+      pull.drain((graph) => {
+        for (const source of Object.keys(graph)) {
+          for (const dest of Object.keys(graph[source])) {
+            // Compute every block edge unrelated to me
+            if (source !== ssb.id && dest !== ssb.id) {
+              const value = graph[source][dest]
+              ssb.ebt.block(source, dest, value === -1)
+            }
           }
         }
-      }
-    })
-  )
+      })
+    )
 
-  // request/block nodes at a reachable distance (within hops config) from me
-  pull(
-    ssb.friends.hopStream({ old: true, live: true }),
-    pull.drain((hops) => {
-      for (const dest of Object.keys(hops)) {
-        requestManager.add(dest, hops[dest])
-      }
-    })
-  )
+    // request/block nodes at a reachable distance (within hops config) from me
+    pull(
+      ssb.friends.hopStream({ old: true, live: true }),
+      pull.drain((hops) => {
+        for (const dest of Object.keys(hops)) {
+          requestManager.add(dest, hops[dest])
+        }
+      })
+    )
+  }
+
+  function reconfigure(opts) {
+    requestManager.reconfigure(opts)
+  }
 
   return {
-    reconfigure(opts) {
-      requestManager.reconfigure(opts)
-    },
+    start,
+    reconfigure,
   }
 }
