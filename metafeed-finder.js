@@ -142,6 +142,7 @@ module.exports = class MetafeedFinder {
 
   async _forEachNeighborPeer(run) {
     for (const peerId of Object.keys(this._ssb.peers)) {
+      if (peerId === this._ssb.id) continue
       for (const rpc of this._ssb.peers[peerId]) {
         const goToNext = await new Promise((resolve) => run(rpc, resolve))
         if (!goToNext) return
