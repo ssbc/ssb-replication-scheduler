@@ -337,16 +337,20 @@ tape('once bob blocks alice, he cant replicate subfeeds anymore', async (t) => {
   await pify(alice.db.publish)({ type: 'post', text: 'Whatever' })
   t.pass('alice published a new post')
 
-  const aliceRootMF = await pify(alice.metafeeds.find)()
-  gameFeed = await pify(alice.metafeeds.create)(aliceRootMF, {
-    feedpurpose: 'mygame',
-    feedformat: 'classic',
-    metadata: {
-      score: 0,
-      whateverElse: true,
-    },
-  })
-  t.pass('alice created a game subfeed')
+  const aliceRootMF = await pify(alice.metafeeds.getRoot)()
+  gameFeed = await pify(alice.metafeeds.findOrCreate)(
+    aliceRootMF,
+    (f) => f.feedpurpose === 'chess',
+    {
+      feedpurpose: 'mygame',
+      feedformat: 'classic',
+      metadata: {
+        score: 0,
+        whateverElse: true,
+      },
+    }
+  )
+  t.pass('alice created a game subfeed ' + gameFeed.keys.id.slice(0, 20))
 
   await pify(alice.db.publishAs)(gameFeed.keys, {
     type: 'game',
