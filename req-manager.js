@@ -138,23 +138,21 @@ module.exports = class RequestManager {
     if (!this._hasCloseHook) this._setupCloseHook()
 
     if (!this._oldBranchDrainer) {
+      const opts = { old: true, live: false }
       pull(
-        this._ssb.metafeeds.branchStream({ old: true, live: false }),
+        this._ssb.metafeeds.branchStream(opts),
         (this._oldBranchDrainer = pull.drain((branch) => {
-          const metaFeedId = branch[0][0]
-          const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-          this._handleBranch(branch, mainFeedId)
+          this._handleBranch(branch)
         }))
       )
     }
 
     if (!this._liveBranchDrainer) {
+      const opts = { old: false, live: true }
       pull(
-        this._ssb.metafeeds.branchStream({ old: false, live: true }),
+        this._ssb.metafeeds.branchStream(opts),
         (this._liveBranchDrainer = pull.drain((branch) => {
-          const metaFeedId = branch[0][0]
-          const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-          this._handleBranch(branch, mainFeedId)
+          this._handleBranch(branch)
         }))
       )
     }
@@ -191,8 +189,11 @@ module.exports = class RequestManager {
     return template.matchBranch(branch, mainFeedId)
   }
 
-  _handleBranch(branch, mainFeedId) {
+  _handleBranch(branch) {
+    const first = branch[0]
     const last = branch[branch.length - 1]
+    const metaFeedId = first[0]
+    const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
     const subfeed = last[0]
 
     if (this._requestedPartially.has(mainFeedId)) {
@@ -260,7 +261,7 @@ module.exports = class RequestManager {
         pull.drain(
           (branch) => {
             branchesFound = true
-            this._handleBranch(branch, feedId)
+            this._handleBranch(branch)
           },
           () => {
             if (branchesFound === false) {
@@ -307,7 +308,7 @@ module.exports = class RequestManager {
       pull(
         this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
         pull.drain((branch) => {
-          this._handleBranch(branch, feedId)
+          this._handleBranch(branch)
         })
       )
     }
@@ -331,7 +332,7 @@ module.exports = class RequestManager {
       pull(
         this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
         pull.drain((branch) => {
-          this._handleBranch(branch, feedId)
+          this._handleBranch(branch)
         })
       )
     }
