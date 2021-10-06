@@ -190,11 +190,11 @@ module.exports = class RequestManager {
   }
 
   _handleBranch(branch) {
-    const first = branch[0]
-    const last = branch[branch.length - 1]
-    const metaFeedId = first[0]
+    const root = branch[0]
+    const leaf = branch[branch.length - 1]
+    const metaFeedId = root[0]
     const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
-    const subfeed = last[0]
+    const subfeed = leaf[0]
 
     if (this._requestedPartially.has(mainFeedId)) {
       const hops = this._requestedPartially.get(mainFeedId)
