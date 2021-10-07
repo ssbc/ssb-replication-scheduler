@@ -315,7 +315,7 @@ module.exports = class RequestManager {
     this._ssb.ebt.request(feedId, false, ebtFormat)
     this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
 
-    if (this._ssb.metafeeds) {
+    if (this._templates) {
       // Weave through all of the subfeeds and unrequest them too
       const root = this._metafeedFinder.get(feedId) || feedId
       pull(
@@ -339,7 +339,7 @@ module.exports = class RequestManager {
     this._ssb.ebt.request(feedId, false, ebtFormat)
     this._ssb.ebt.block(this._ssb.id, feedId, true, ebtFormat)
 
-    if (this._ssb.metafeeds) {
+    if (this._templates) {
       // Weave through all of the subfeeds and block them too
       const root = this._metafeedFinder.get(feedId) || feedId
       pull(
