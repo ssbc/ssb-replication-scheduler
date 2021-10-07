@@ -205,6 +205,7 @@ module.exports = class RequestManager {
     const leaf = branch[branch.length - 1]
     const metaFeedId = root[0]
     const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+    if (!mainFeedId) return
     const subfeed = leaf[0]
 
     if (this._requestedPartially.has(mainFeedId)) {
