@@ -108,8 +108,12 @@ module.exports = class RequestManager {
 
   _findTemplateForHops(hops) {
     if (!this._templates) return null
-    const eligibleHopsArr = [...this._templates.keys()].filter((h) => h >= hops)
-    const pickedHops = Math.min(...eligibleHopsArr)
+    const templateKeys = [...this._templates.keys()]
+    const eligibleHopsArr = templateKeys.filter((h) => h >= hops)
+    const pickedHops =
+      eligibleHopsArr.length > 0
+        ? Math.min(...eligibleHopsArr)
+        : Math.max(...templateKeys)
     return this._templates.get(pickedHops)
   }
 
