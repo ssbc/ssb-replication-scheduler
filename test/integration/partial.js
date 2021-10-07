@@ -599,8 +599,10 @@ tape('alice tombstones a subfeed, and david cannot replicate it', async (t) => {
 
   t.equals(
     await david.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
-    6, // add main + add indexes + add post + add contact + add game + tombstone
-    'david replicated 6 bendybutt msgs'
+    // ALICE: main + indexes + post idx + contact idx + add game + tombstone
+    // BOB: main + indexes + post idx + contact idx
+    10,
+    'david replicated 10 bendybutt msgs'
   )
 
   const davidClock = await pify(david.getVectorClock)()
