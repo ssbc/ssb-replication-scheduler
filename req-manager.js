@@ -17,7 +17,7 @@ module.exports = class RequestManager {
         : DEFAULT_PERIOD
     this._requestables = new Map() // feedId => hops
     this._requested = new Map() // feedId => hops
-    this._requestedPartially = new Map() // feedId => hops
+    this._requestedPartially = new Map() // mainFeedId => hops
     this._unrequested = new Map() // feedId => hops when it used to be requested
     this._blocked = new Map() // feedId => hops before it was blocked
     this._tombstoned = new Set() // feedIds
@@ -41,23 +41,23 @@ module.exports = class RequestManager {
     }
   }
 
-  add(feedId, hops) {
-    if (hops === -1) return this._block(feedId)
-    if (hops < -1) return this._unrequest(feedId)
+  add(mainFeedId, hops) {
+    if (hops === -1) return this._block(mainFeedId)
+    if (hops < -1) return this._unrequest(mainFeedId)
 
-    const sameHops = hops === this._getCurrentHops(feedId)
-    if (sameHops && this._requestables.has(feedId)) return
-    if (sameHops && this._requested.has(feedId)) return
-    if (sameHops && this._requestedPartially.has(feedId)) return
+    const sameHops = hops === this._getCurrentHops(mainFeedId)
+    if (sameHops && this._requestables.has(mainFeedId)) return
+    if (sameHops && this._requested.has(mainFeedId)) return
+    if (sameHops && this._requestedPartially.has(mainFeedId)) return
 
     if (!sameHops) {
-      this._requestables.delete(feedId)
-      this._requested.delete(feedId)
-      this._requestedPartially.delete(feedId)
-      this._unrequested.delete(feedId)
-      this._blocked.delete(feedId)
+      this._requestables.delete(mainFeedId)
+      this._requested.delete(mainFeedId)
+      this._requestedPartially.delete(mainFeedId)
+      this._unrequested.delete(mainFeedId)
+      this._blocked.delete(mainFeedId)
 
-      this._requestables.set(feedId, hops)
+      this._requestables.set(mainFeedId, hops)
       this._latestAdd = Date.now()
       this._scheduleDebouncedFlush()
     }
@@ -74,9 +74,9 @@ module.exports = class RequestManager {
       this._requestables.set(feedId, hops)
       this._requested.delete(feedId)
     }
-    for (const [feedId, hops] of this._requestedPartially) {
-      this._requestables.set(feedId, hops)
-      this._requestedPartially.delete(feedId)
+    for (const [mainFeedId, hops] of this._requestedPartially) {
+      this._requestables.set(mainFeedId, hops)
+      this._requestedPartially.delete(mainFeedId)
     }
     // Refresh only the old branches stream drainer, not the live streams
     if (this._oldBranchDrainer) this._oldBranchDrainer.abort()
@@ -242,29 +242,29 @@ module.exports = class RequestManager {
     }
   }
 
-  _fetchAndRequestMetafeed(feedId, hops) {
-    this._metafeedFinder.fetch(feedId, (err, metafeedId) => {
+  _fetchAndRequestMetafeed(mainFeedId, hops) {
+    this._metafeedFinder.fetch(mainFeedId, (err, metafeedId) => {
       if (err) {
         console.error(err)
       } else if (!metafeedId) {
-        console.error('cannot partially replicate ' + feedId)
+        console.error('cannot partially replicate ' + mainFeedId)
       } else {
         this._request(metafeedId, hops)
       }
     })
   }
 
-  _requestPartially(feedId) {
-    if (this._requestedPartially.has(feedId)) return
-    if (!this._requestables.has(feedId)) return
-    debug('will process %s for partial replication', feedId)
+  _requestPartially(mainFeedId) {
+    if (this._requestedPartially.has(mainFeedId)) return
+    if (!this._requestables.has(mainFeedId)) return
+    debug('will process %s for partial replication', mainFeedId)
 
-    const hops = this._getCurrentHops(feedId)
-    this._requestedPartially.set(feedId, hops)
-    this._requestables.delete(feedId)
+    const hops = this._getCurrentHops(mainFeedId)
+    this._requestedPartially.set(mainFeedId, hops)
+    this._requestables.delete(mainFeedId)
 
     // We may already have the meta feed, so continue replicating
-    const root = this._metafeedFinder.get(feedId)
+    const root = this._metafeedFinder.get(mainFeedId)
     if (root) {
       let branchesFound = false
       const opts = { root, tombstoned: false, old: true, live: false }
@@ -277,7 +277,7 @@ module.exports = class RequestManager {
           },
           () => {
             if (branchesFound === false) {
-              this._fetchAndRequestMetafeed(feedId, hops)
+              this._fetchAndRequestMetafeed(mainFeedId, hops)
             }
           }
         )
@@ -285,7 +285,7 @@ module.exports = class RequestManager {
     }
     // Fetch metafeedId for this (main) feedId for the first time
     else {
-      this._fetchAndRequestMetafeed(feedId, hops)
+      this._fetchAndRequestMetafeed(mainFeedId, hops)
     }
   }
 
@@ -374,8 +374,8 @@ module.exports = class RequestManager {
     }
   }
 
-  _supportsPartialReplication(feedId, cb) {
-    this._metafeedFinder.fetch(feedId, (err, metafeedId) => {
+  _supportsPartialReplication(mainFeedId, cb) {
+    this._metafeedFinder.fetch(mainFeedId, (err, metafeedId) => {
       if (err) cb(err)
       else cb(null, !!metafeedId)
     })
