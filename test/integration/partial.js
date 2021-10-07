@@ -35,14 +35,16 @@ const INDEX_WRITING_TIMEOUT = 3e3
 const aliceKeys = u.keysFor('alice')
 const bobKeys = u.keysFor('bob')
 const carolKeys = u.keysFor('carol')
+const davidKeys = u.keysFor('david')
 let alice
 let bob
-let carol
+let david
 
 tape('setup', async (t) => {
   rimraf.sync(path.join(os.tmpdir(), 'server-alice'))
   rimraf.sync(path.join(os.tmpdir(), 'server-bob'))
   rimraf.sync(path.join(os.tmpdir(), 'server-carol'))
+  rimraf.sync(path.join(os.tmpdir(), 'server-david'))
 
   alice = createSsbServer({
     path: path.join(os.tmpdir(), 'server-alice'),
@@ -547,11 +549,72 @@ tape('bob starts a root meta feed and indexes, alice replicates', async (t) => {
   t.end()
 })
 
+tape('alice tombstones a subfeed, and david cannot replicate it', async (t) => {
+  const aliceRootMF = await pify(alice.metafeeds.getRoot)()
+  await pify(alice.metafeeds.findAndTombstone)(
+    aliceRootMF,
+    (f) => f.feedpurpose === 'mygame',
+    'This game is too good'
+  )
+
+  david = createSsbServer({
+    path: path.join(os.tmpdir(), 'server-david'),
+    keys: davidKeys,
+    timeout: CONNECTION_TIMEOUT,
+    timers: { inactivity: INACTIVITY_TIMEOUT },
+    friends: { hops: 2 },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: null,
+        1: {
+          subfeeds: [
+            { feedpurpose: 'mygame' },
+            {
+              feedpurpose: 'indexes',
+              subfeeds: [
+                {
+                  feedpurpose: 'index',
+                  $format: 'indexed',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  })
+  t.pass('david initialized')
+
+  // This needs to happen before publishing follows, otherwise carol
+  // defaults to normal replication (which means she won't replicate meta feeds)
+  await pify(david.connect)(alice.getAddress())
+  t.pass('david is connected to alice')
+
+  await pify(david.db.publish)(u.follow(alice.id))
+  t.pass('david follows alice')
+
+  await sleep(REPLICATION_TIMEOUT)
+  t.pass('replication period is over')
+
+  t.equals(
+    await david.db.query(where(authorIsBendyButtV1()), count(), toPromise()),
+    6, // add main + add indexes + add post + add contact + add game + tombstone
+    'david replicated 6 bendybutt msgs'
+  )
+
+  const davidClock = await pify(david.getVectorClock)()
+  t.notOk(davidClock[gameFeed.keys.id], "david's clock lacks the game feed")
+
+  t.end()
+})
+
 tape('teardown', async (t) => {
   await Promise.all([
     pify(alice.close)(true),
     pify(bob.close)(true),
     pify(carol.close)(true),
+    pify(david.close)(true),
   ])
 
   t.end()

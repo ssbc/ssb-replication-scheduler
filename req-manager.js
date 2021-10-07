@@ -20,13 +20,14 @@ module.exports = class RequestManager {
     this._requestedPartially = new Map() // feedId => hops
     this._unrequested = new Map() // feedId => hops when it used to be requested
     this._blocked = new Map() // feedId => hops before it was blocked
-    // FIXME: how should we handle tombstoning?
+    this._tombstoned = new Set() // feedIds
     this._flushing = false
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
     this._oldBranchDrainer = null
     this._liveBranchDrainer = null
+    this._tombstonedBranchDrainer = null
     this._liveFinderDrainer = null
     this._hasCloseHook = false
     this._templates = this._setupTemplates(this._opts.partialReplication)
@@ -118,6 +119,7 @@ module.exports = class RequestManager {
     this._ssb.close.hook(function (fn, args) {
       if (that._oldBranchDrainer) that._oldBranchDrainer.abort()
       if (that._liveBranchDrainer) that._liveBranchDrainer.abort()
+      if (that._tombstonedBranchDrainer) that._tombstonedBranchDrainer.abort()
       if (that._liveFinderDrainer) that._liveFinderDrainer.abort()
       fn.apply(this, args)
     })
@@ -138,7 +140,7 @@ module.exports = class RequestManager {
     if (!this._hasCloseHook) this._setupCloseHook()
 
     if (!this._oldBranchDrainer) {
-      const opts = { old: true, live: false }
+      const opts = { tombstoned: false, old: true, live: false }
       pull(
         this._ssb.metafeeds.branchStream(opts),
         (this._oldBranchDrainer = pull.drain((branch) => {
@@ -148,11 +150,22 @@ module.exports = class RequestManager {
     }
 
     if (!this._liveBranchDrainer) {
-      const opts = { old: false, live: true }
+      const opts = { tombstoned: false, old: false, live: true }
       pull(
         this._ssb.metafeeds.branchStream(opts),
         (this._liveBranchDrainer = pull.drain((branch) => {
           this._handleBranch(branch)
+        }))
+      )
+    }
+
+    if (!this._tombstonedBranchDrainer) {
+      const opts = { tombstoned: true, old: true, live: true }
+      pull(
+        this._ssb.metafeeds.branchStream(opts),
+        (this._tombstonedBranchDrainer = pull.drain((branch) => {
+          const [leafId] = branch[branch.length - 1]
+          this._tombstone(leafId, true)
         }))
       )
     }
@@ -179,8 +192,6 @@ module.exports = class RequestManager {
         }))
       )
     }
-
-    // FIXME: pull tombstoneBranchStream and do ssb.ebt.request(tombId, false)
   }
 
   _matchBranchWith(hops, branch, mainFeedId) {
@@ -256,8 +267,9 @@ module.exports = class RequestManager {
     const root = this._metafeedFinder.get(feedId)
     if (root) {
       let branchesFound = false
+      const opts = { root, tombstoned: false, old: true, live: false }
       pull(
-        this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
+        this._ssb.metafeeds.branchStream(opts),
         pull.drain(
           (branch) => {
             branchesFound = true
@@ -302,9 +314,9 @@ module.exports = class RequestManager {
     this._ssb.ebt.request(feedId, false, ebtFormat)
     this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
 
-    // Weave through all of the subfeeds and unrequest them too
-    const root = this._metafeedFinder.get(feedId)
-    if (root) {
+    if (this._ssb.metafeeds) {
+      // Weave through all of the subfeeds and unrequest them too
+      const root = this._metafeedFinder.get(feedId) || feedId
       pull(
         this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
         pull.drain((branch) => {
@@ -326,13 +338,37 @@ module.exports = class RequestManager {
     this._ssb.ebt.request(feedId, false, ebtFormat)
     this._ssb.ebt.block(this._ssb.id, feedId, true, ebtFormat)
 
-    // Weave through all of the subfeeds and block them too
-    const root = this._metafeedFinder.get(feedId)
-    if (root) {
+    if (this._ssb.metafeeds) {
+      // Weave through all of the subfeeds and block them too
+      const root = this._metafeedFinder.get(feedId) || feedId
       pull(
         this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
         pull.drain((branch) => {
           this._handleBranch(branch)
+        })
+      )
+    }
+  }
+
+  _tombstone(feedId, shouldWeave = false) {
+    if (this._tombstoned.has(feedId)) return
+    debug('will stop replicating tombstoned %s', feedId)
+
+    this._requestables.delete(feedId)
+    this._requested.delete(feedId)
+    this._requestedPartially.delete(feedId)
+    this._blocked.delete(feedId)
+    this._tombstoned.add(feedId)
+    this._ssb.ebt.request(feedId, false)
+
+    // Weave through all of the subfeeds and tombstone them too
+    if (shouldWeave) {
+      const opts = { root: feedId, tombstoned: null, old: true, live: false }
+      pull(
+        this._ssb.metafeeds.branchStream(opts),
+        pull.drain((branch) => {
+          const [leafId] = branch[branch.length - 1]
+          this._tombstone(leafId, false)
         })
       )
     }
