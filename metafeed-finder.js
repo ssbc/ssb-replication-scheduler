@@ -162,6 +162,7 @@ module.exports = class MetafeedFinder {
       else if (Date.now() - this._latestRequestTime > this._period)
         this._flush()
     }, this._period * 0.5)
+    if (this._timer.unref) this._timer.unref()
   }
 
   _makeQL1(map) {
