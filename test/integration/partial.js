@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 Andre 'Staltz' Medeiros
+//
+// SPDX-License-Identifier: Unlicense
+
 const tape = require('tape')
 const path = require('path')
 const os = require('os')
