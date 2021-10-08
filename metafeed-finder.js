@@ -5,13 +5,11 @@ const detectSsbNetworkErrorSeverity = require('ssb-network-errors')
 const { where, type, live, toPullStream } = require('ssb-db2/operators')
 const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 
-const DEFAULT_PERIOD = 500
-
 module.exports = class MetafeedFinder {
-  constructor(ssb, opts, period) {
+  constructor(ssb, opts, period = 500) {
     this._ssb = ssb
     this._opts = opts
-    this._period = period || DEFAULT_PERIOD
+    this._period = period
     this._map = new Map() // mainFeedId => rootMetaFeedId
     this._inverseMap = new Map() // rootMetaFeedId => mainFeedId
     this._requestsByMainfeedId = new Map() // mainFeedId => Array<Calback>
