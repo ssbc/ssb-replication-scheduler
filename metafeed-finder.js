@@ -13,6 +13,7 @@ module.exports = class MetafeedFinder {
     this._map = new Map() // mainFeedId => rootMetaFeedId
     this._inverseMap = new Map() // rootMetaFeedId => mainFeedId
     this._requestsByMainfeedId = new Map() // mainFeedId => Array<Calback>
+    this._retryables = new Set() // mainFeedIds
     this._latestRequestTime = 0
     this._timer = null
     this._liveStream = pushable()
@@ -28,6 +29,7 @@ module.exports = class MetafeedFinder {
         )
       }
       this._loadAllFromLog()
+      this._monitorConnectedPeers()
     }
   }
 
@@ -97,6 +99,26 @@ module.exports = class MetafeedFinder {
     )
   }
 
+  _monitorConnectedPeers() {
+    if (!this._ssb.conn) {
+      console.warn(
+        'No ssb-conn installed, ssb-replication-scheduler will ' +
+          ' miss some useful data from connected peers regarding metafeeds'
+      )
+      return
+    }
+
+    pull(
+      this._ssb.conn.hub().listen(),
+      pull.filter((ev) => ev.type === 'connected'),
+      pull.drain((ev) => {
+        if (this._retryables.size > 0) {
+          this._retryWithPeer(ev.details.rpc)
+        }
+      })
+    )
+  }
+
   _validateMetafeedAnnounce(msg) {
     const err = validateMetafeedAnnounce(msg)
     if (err) {
@@ -117,6 +139,7 @@ module.exports = class MetafeedFinder {
     const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
     this._map.set(mainFeedId, metaFeedId)
     this._inverseMap.set(metaFeedId, mainFeedId)
+    this._retryables.delete(mainFeedId)
   }
 
   _request(mainFeedId, cb) {
@@ -163,12 +186,12 @@ module.exports = class MetafeedFinder {
     if (this._timer.unref) this._timer.unref()
   }
 
-  _makeQL1(map) {
+  _makeQL1(mapOrSet) {
     const query = {
       op: 'or',
       args: [],
     }
-    for (const mainFeedId of map.keys()) {
+    for (const mainFeedId of mapOrSet.keys()) {
       query.args.push({
         op: 'and',
         args: [
@@ -225,10 +248,35 @@ module.exports = class MetafeedFinder {
       // We couldn't find metaFeedIds for some mainFeedIds, so we assume there
       // none. Note, this may give false negatives depending on who you're
       // connected to!
-      for (const callbacks of requests.values()) {
+      for (const [mainFeedId, callbacks] of requests.entries()) {
+        this._retryables.add(mainFeedId)
         for (const cb of callbacks) cb(null, null)
       }
       requests.clear()
     }
+  }
+
+  _retryWithPeer(rpc) {
+    debug('"getSubset" retry on peer %s for metafeed/announce messages', rpc.id)
+    pull(
+      rpc.getSubset(this._makeQL1(this._retryables), { querylang: 'ssb-ql-1' }),
+      pull.filter((value) => this._validateMetafeedAnnounce({ value })),
+      pull.drain(
+        (msgVal) => {
+          this._updateMapsFromMsgValue(msgVal)
+          this._liveStream.push(this._pluckFromAnnounceMsg(msgVal))
+          this._persist(msgVal)
+        },
+        (err) => {
+          if (err && detectSsbNetworkErrorSeverity(err) >= 2) {
+            debug(
+              'failed "getSubset" muxrpc retry at peer %s because: %s',
+              rpc.id,
+              err.message || err
+            )
+          }
+        }
+      )
+    )
   }
 }
