@@ -183,7 +183,6 @@ module.exports = class MetafeedFinder {
   }
 
   async _flush() {
-    let drainer
     const requests = new Map(this._requestsByMainfeedId)
     this._requestsByMainfeedId.clear()
 
@@ -192,21 +191,22 @@ module.exports = class MetafeedFinder {
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
         pull.filter((value) => this._validateMetafeedAnnounce({ value })),
-        (drainer = pull.drain(
+        pull.drain(
           (msgVal) => {
             this._updateMapsFromMsgValue(msgVal)
             const [mainFeedId, metaFeedId] = this._pluckFromAnnounceMsg(msgVal)
+            this._liveStream.push([mainFeedId, metaFeedId])
+            this._persist(msgVal)
+
             if (requests.has(mainFeedId)) {
-              this._persist(msgVal)
               const callbacks = requests.get(mainFeedId)
               requests.delete(mainFeedId)
               for (const cb of callbacks) cb(null, metaFeedId)
-              if (requests.size === 0) {
-                drainer.abort()
-                goToNextNeighbor(false)
-              } else {
-                goToNextNeighbor(true)
-              }
+            }
+
+            if (requests.size === 0) {
+              goToNextNeighbor(false)
+              return false // abort this drain
             }
           },
           (err) => {
@@ -219,7 +219,7 @@ module.exports = class MetafeedFinder {
             }
             goToNextNeighbor(true)
           }
-        ))
+        )
       )
     })
 
