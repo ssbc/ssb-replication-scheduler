@@ -11,7 +11,9 @@
   },
   "main": "index.js",
   "files": [
-    "*.js"
+    "*.js",
+    "package.json.license",
+    "LICENSES/*"
   ],
   "engines": {
     "node": ">=10"

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 Andre 'Staltz' Medeiros
+//
+// SPDX-License-Identifier: Unlicense
+
 const tape = require('tape')
 const ssbKeys = require('ssb-keys')
 const path = require('path')
