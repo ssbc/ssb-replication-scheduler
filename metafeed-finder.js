@@ -212,6 +212,8 @@ module.exports = class MetafeedFinder {
   }
 
   async _flush() {
+    if (this._requestsByMainfeedId.size === 0) return
+
     const requests = new Map(this._requestsByMainfeedId)
     this._requestsByMainfeedId.clear()
 
