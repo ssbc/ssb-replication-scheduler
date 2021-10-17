@@ -176,6 +176,10 @@ module.exports = class MetafeedFinder {
   }
 
   _scheduleDebouncedFlush() {
+    if (this._period === 0) {
+      this._flush()
+      return
+    }
     if (this._timer) return // Timer is already enabled
     this._timer = setInterval(() => {
       // Turn off the timer if there is nothing to flush
