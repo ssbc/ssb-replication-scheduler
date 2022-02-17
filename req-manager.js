@@ -7,14 +7,15 @@ const debug = require('debug')('ssb:replication-scheduler')
 const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
 const Template = require('./template')
+const MetafeedFinder = require('./metafeed-finder')
 
 const DEFAULT_PERIOD = 150 // ms
 
 module.exports = class RequestManager {
-  constructor(ssb, opts, metafeedFinder) {
+  constructor(ssb, opts) {
     this._ssb = ssb
     this._opts = opts
-    this._metafeedFinder = metafeedFinder
+    this._metafeedFinder = new MetafeedFinder(ssb, opts)
     this._period =
       typeof opts.debouncePeriod === 'number'
         ? opts.debouncePeriod

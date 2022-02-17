@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
-const MetafeedFinder = require('./metafeed-finder')
 const RequestManager = require('./req-manager')
 
 const DEFAULT_OPTS = {
@@ -28,8 +27,7 @@ exports.init = function (ssb, config) {
   }
 
   const opts = config.replicationScheduler || DEFAULT_OPTS
-  const metafeedFinder = new MetafeedFinder(ssb, opts)
-  const requestManager = new RequestManager(ssb, opts, metafeedFinder)
+  const requestManager = new RequestManager(ssb, opts)
   let started = false
 
   if (opts.autostart === true || typeof opts.autostart === 'undefined') {
@@ -43,13 +41,12 @@ exports.init = function (ssb, config) {
     // Replicate myself ASAP, without request manager
     ssb.ebt.request(ssb.id, true)
 
-    // For each edge in the social graph, call either `request` or `block`
+    // Take every block or unblock into account, except if it's about me
     pull(
       ssb.friends.graphStream({ old: true, live: true }),
       pull.drain((graph) => {
         for (const source of Object.keys(graph)) {
           for (const dest of Object.keys(graph[source])) {
-            // Compute every block edge unrelated to me
             if (source !== ssb.id && dest !== ssb.id) {
               const value = graph[source][dest]
               ssb.ebt.block(source, dest, value === -1)
