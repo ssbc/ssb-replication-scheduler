@@ -1,7 +1,7 @@
 {
   "name": "ssb-replication-scheduler",
   "description": "A secret-stack plugin to orchestrate replication using EBT",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "author": "Andre Staltz <contact@staltz.com>",
   "license": "LGPL-3.0",
   "homepage": "https://github.com/ssb-ngi-pointer/ssb-replication-scheduler",
