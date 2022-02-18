@@ -10,12 +10,13 @@ const Template = require('./template')
 const MetafeedFinder = require('./metafeed-finder')
 
 const DEFAULT_PERIOD = 150 // ms
+const BATCH_LIMIT = 8
 
 module.exports = class RequestManager {
   constructor(ssb, opts) {
     this._ssb = ssb
     this._opts = opts
-    this._metafeedFinder = new MetafeedFinder(ssb, opts)
+    this._metafeedFinder = new MetafeedFinder(ssb, opts, BATCH_LIMIT)
     this._period =
       typeof opts.debouncePeriod === 'number'
         ? opts.debouncePeriod

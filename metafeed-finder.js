@@ -10,10 +10,11 @@ const { where, type, live, toPullStream } = require('ssb-db2/operators')
 const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 
 module.exports = class MetafeedFinder {
-  constructor(ssb, opts, period = 500) {
+  constructor(ssb, opts, batchLimit = 8, period = 500) {
     this._ssb = ssb
     this._opts = opts
     this._period = period
+    this._batchLimit = batchLimit
     this._map = new Map() // mainFeedId => rootMetaFeedId
     this._inverseMap = new Map() // rootMetaFeedId => mainFeedId
     this._requestsByMainfeedId = new Map() // mainFeedId => Array<Calback>
@@ -151,7 +152,11 @@ module.exports = class MetafeedFinder {
     callbacks.push(cb)
     this._requestsByMainfeedId.set(mainFeedId, callbacks)
     this._latestRequestTime = Date.now()
-    this._scheduleDebouncedFlush()
+    if (this._requestsByMainfeedId.size >= this._batchLimit) {
+      this._flush()
+    } else {
+      this._scheduleDebouncedFlush()
+    }
   }
 
   _persist(msgVal) {
