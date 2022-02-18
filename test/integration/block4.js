@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2021 Andre 'Staltz' Medeiros
+// SPDX-FileCopyrightText: 2022 Andre 'Staltz' Medeiros
 //
 // SPDX-License-Identifier: Unlicense
 
@@ -8,14 +8,6 @@ const pify = require('promisify-4loc')
 const sleep = require('util').promisify(setTimeout)
 const SecretStack = require('secret-stack')
 const u = require('../misc/util')
-
-// alice, bob, and carol all follow each other,
-// but then bob offends alice, and she blocks him.
-// this means that:
-//
-// 1. when bob tries to connect to alice, she refuses.
-// 2. alice never tries to connect to bob. (removed from peers)
-// 3. carol will not give bob any, she will not give him any data from alice.
 
 const createSsbServer = SecretStack({
   caps: { shs: crypto.randomBytes(32).toString('base64') },
