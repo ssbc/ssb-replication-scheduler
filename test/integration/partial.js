@@ -113,8 +113,6 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
       partialReplication: {
         0: {
           subfeeds: [
-            { feedpurpose: 'main' },
-            { feedpurpose: 'mygame' },
             {
               feedpurpose: 'indexes',
               subfeeds: [
@@ -124,6 +122,10 @@ tape('alice writes index feeds and bob replicates them', async (t) => {
                 },
               ],
             },
+            // Empty object to signal "replicate anything else".
+            // Note that order is important. This more general rule has the come
+            // after the more specific rule for indexed subfeeds.
+            {}
           ],
         },
         1: null,
@@ -450,7 +452,6 @@ tape('bob reconfigures to replicate a game feed from alice', async (t) => {
           },
         ],
       },
-      /**/
 
       1: {
         subfeeds: [
