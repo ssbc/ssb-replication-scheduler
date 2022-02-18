@@ -19,7 +19,14 @@
     "node": ">=10"
   },
   "dependencies": {
-    "pull-stream": "^3.6.0"
+    "debug": "^4.3.2",
+    "pull-pushable": "^2.2.0",
+    "pull-stream": "^3.6.0",
+    "ssb-db2": "^2.8.9",
+    "ssb-ebt": "^8.0.0",
+    "ssb-meta-feeds": "~0.28.0",
+    "ssb-network-errors": "^1.0.1",
+    "ssb-subset-ql": "~0.6.2"
   },
   "devDependencies": {
     "cat-names": "^3.0.0",
@@ -27,7 +34,7 @@
     "husky": "^4.3.0",
     "mkdirp": "^1.0.4",
     "nyc": "^15.1.0",
-    "prettier": "^2.1.2",
+    "prettier": "^2.4.0",
     "pretty-quick": "^3.1.0",
     "promisify-4loc": "^1.0.0",
     "pull-paramap": "^1.2.2",
@@ -36,17 +43,17 @@
     "secret-stack": "^6.4.0",
     "ssb-caps": "^1.1.0",
     "ssb-db": "^20.4.0",
-    "ssb-db2": "^2.2.0",
-    "ssb-ebt": "^7.0.0",
-    "ssb-fixtures": "^2.4.1",
-    "ssb-friends": "^5.0.0",
-    "ssb-keys": "^8.1.0",
+    "ssb-fixtures": "^3.0.4",
+    "ssb-friends": "^5.1.0",
+    "ssb-index-feed-writer": "~0.7.0",
+    "ssb-keys": "^8.2.0",
+    "ssb-subset-rpc": "~0.3.1",
     "tap-spec": "^5.0.0",
-    "tape": "^5.2.2"
+    "tape": "^5.5.2"
   },
   "scripts": {
     "test": "tape 'test/@(unit|integration)/*.js' | tap-spec",
-    "coverage": "nyc npm run test",
+    "coverage": "nyc --reporter=lcov npm test",
     "format-code": "prettier --write \"*.js\" \"test/(integration|misc|unit)/*.js\"",
     "format-code-staged": "pretty-quick --staged --pattern \"*.js\" --pattern \"test/(integration|misc|unit)/*.js\""
   },

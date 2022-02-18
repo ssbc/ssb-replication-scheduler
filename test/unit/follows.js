@@ -16,16 +16,14 @@ tape('listen to friends stream and replicates initial follows', (t) => {
     init(sbot) {
       return {
         graphStream() {
-          return pull.values([
-            {
-              [sbot.id]: {
-                [bobId]: 1,
-              },
-            },
-          ])
+          return pull.empty()
         },
         hopStream() {
-          return pull.empty()
+          return pull.values([
+            {
+              [bobId]: 1,
+            },
+          ])
         },
       }
     },
@@ -54,7 +52,11 @@ tape('listen to friends stream and replicates initial follows', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })
 
 tape('listen to friends stream and replicates subsequent follows', (t) => {
@@ -66,16 +68,14 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
     init(sbot) {
       return {
         graphStream() {
-          return pull.values([
-            {
-              [sbot.id]: {
-                [bobId]: 1,
-              },
-            },
-          ])
+          return pull.empty()
         },
         hopStream() {
-          return pull.empty()
+          return pull.values([
+            {
+              [bobId]: 1,
+            },
+          ])
         },
       }
     },
@@ -102,5 +102,9 @@ tape('listen to friends stream and replicates subsequent follows', (t) => {
       },
     })
     .use(require('../..'))
-    .call(null, {})
+    .call(null, {
+      replicationScheduler: {
+        debouncePeriod: 0,
+      },
+    })
 })

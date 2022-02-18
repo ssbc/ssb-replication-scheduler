@@ -34,6 +34,14 @@ exports.block = function unfollow(id) {
   }
 }
 
+exports.unblock = function (id) {
+  return {
+    type: 'contact',
+    contact: id,
+    blocking: false,
+  }
+}
+
 exports.readOnceFromDB = function (sbot) {
   return new Promise((resolve) => {
     var cancel = sbot.post((msg) => {

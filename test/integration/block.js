@@ -36,6 +36,9 @@ const alice = createSsbServer({
   friends: {
     hops: 1,
   },
+  replicationScheduler: {
+    debouncePeriod: 0,
+  },
 })
 
 const bob = createSsbServer({
@@ -45,6 +48,9 @@ const bob = createSsbServer({
   friends: {
     hops: 1,
   },
+  replicationScheduler: {
+    debouncePeriod: 0,
+  },
 })
 
 const carol = createSsbServer({
@@ -53,6 +59,9 @@ const carol = createSsbServer({
   keys: u.keysFor('carol'),
   friends: {
     hops: 1,
+  },
+  replicationScheduler: {
+    debouncePeriod: 0,
   },
 })
 

@@ -42,6 +42,9 @@ tape('hops 1', async (t) => {
     friends: {
       hops: 1,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const bob = createSsbServer({
@@ -50,6 +53,9 @@ tape('hops 1', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 
@@ -60,6 +66,9 @@ tape('hops 1', async (t) => {
     friends: {
       hops: UNLIMITED,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const david = createSsbServer({
@@ -68,6 +77,9 @@ tape('hops 1', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 
@@ -116,6 +128,9 @@ tape('hops 2', async (t) => {
     friends: {
       hops: 2,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const bob = createSsbServer({
@@ -124,6 +139,9 @@ tape('hops 2', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 
@@ -134,6 +152,9 @@ tape('hops 2', async (t) => {
     friends: {
       hops: UNLIMITED,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const david = createSsbServer({
@@ -142,6 +163,9 @@ tape('hops 2', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 
@@ -182,6 +206,9 @@ tape('hops 2', async (t) => {
     friends: {
       hops: 3,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const bob = createSsbServer({
@@ -190,6 +217,9 @@ tape('hops 2', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 
@@ -200,6 +230,9 @@ tape('hops 2', async (t) => {
     friends: {
       hops: UNLIMITED,
     },
+    replicationScheduler: {
+      debouncePeriod: 0,
+    },
   })
 
   const david = createSsbServer({
@@ -208,6 +241,9 @@ tape('hops 2', async (t) => {
     timeout: CONNECTION_TIMEOUT,
     friends: {
       hops: UNLIMITED,
+    },
+    replicationScheduler: {
+      debouncePeriod: 0,
     },
   })
 

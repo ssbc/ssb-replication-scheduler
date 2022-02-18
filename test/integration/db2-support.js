@@ -20,7 +20,7 @@ const createSsbServer = SecretStack({ caps })
   .use(require('../..'))
 
 const CONNECTION_TIMEOUT = 500 // ms
-const REPLICATION_TIMEOUT = 4 * CONNECTION_TIMEOUT
+const REPLICATION_TIMEOUT = 6 * CONNECTION_TIMEOUT
 
 tape('replicate between 3 peers, using ssb-db2', async (t) => {
   rimraf.sync(path.join(os.tmpdir(), 'server-alice'))
