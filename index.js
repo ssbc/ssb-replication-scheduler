@@ -11,8 +11,9 @@ const DEFAULT_OPTS = {
 }
 
 exports.name = 'replicationScheduler'
-exports.version = '1.0.0'
+exports.version = '2.0.0'
 exports.manifest = {
+  start: 'sync',
   reconfigure: 'sync',
 }
 
