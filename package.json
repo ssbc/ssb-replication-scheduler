@@ -22,7 +22,7 @@
     "debug": "^4.3.2",
     "pull-pushable": "^2.2.0",
     "pull-stream": "^3.6.0",
-    "ssb-db2": "^2.8.9",
+    "ssb-db2": "^3.0.0",
     "ssb-ebt": "^8.0.0",
     "ssb-meta-feeds": "~0.28.0",
     "ssb-network-errors": "^1.0.1",
