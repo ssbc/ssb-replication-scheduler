@@ -30,9 +30,40 @@ exports.init = function (ssb, config) {
   const opts = config.replicationScheduler || DEFAULT_OPTS
   const requestManager = new RequestManager(ssb, opts)
   let started = false
+  let drainGraphStream = null
+  let drainHopStream = null
 
   if (opts.autostart === true || typeof opts.autostart === 'undefined') {
     start()
+  }
+
+  function monitorGraphStream() {
+    // Take every block or unblock into account, except if it's about me
+    pull(
+      ssb.friends.graphStream({ old: true, live: true }),
+      (drainGraphStream = pull.drain((graph) => {
+        for (const source of Object.keys(graph)) {
+          for (const dest of Object.keys(graph[source])) {
+            if (source !== ssb.id && dest !== ssb.id) {
+              const value = graph[source][dest]
+              ssb.ebt.block(source, dest, value === -1)
+            }
+          }
+        }
+      }))
+    )
+  }
+
+  function monitorHopStream() {
+    // request/block nodes at a reachable distance (within hops config) from me
+    pull(
+      ssb.friends.hopStream({ old: true, live: true }),
+      (drainHopStream = pull.drain((hops) => {
+        for (const dest of Object.keys(hops)) {
+          requestManager.add(dest, hops[dest])
+        }
+      }))
+    )
   }
 
   function start() {
@@ -42,30 +73,22 @@ exports.init = function (ssb, config) {
     // Replicate myself ASAP, without request manager
     ssb.ebt.request(ssb.id, true)
 
-    // Take every block or unblock into account, except if it's about me
-    pull(
-      ssb.friends.graphStream({ old: true, live: true }),
-      pull.drain((graph) => {
-        for (const source of Object.keys(graph)) {
-          for (const dest of Object.keys(graph[source])) {
-            if (source !== ssb.id && dest !== ssb.id) {
-              const value = graph[source][dest]
-              ssb.ebt.block(source, dest, value === -1)
-            }
-          }
+    if (ssb.db) {
+      ssb.db.getIndexingActive()((active) => {
+        if (active > 0) {
+          drainGraphStream.abort()
+          drainGraphStream = null
+          drainHopStream.abort()
+          drainHopStream = null
+        } else {
+          monitorGraphStream()
+          monitorHopStream()
         }
-      })
-    )
-
-    // request/block nodes at a reachable distance (within hops config) from me
-    pull(
-      ssb.friends.hopStream({ old: true, live: true }),
-      pull.drain((hops) => {
-        for (const dest of Object.keys(hops)) {
-          requestManager.add(dest, hops[dest])
-        }
-      })
-    )
+      }, true)
+    } else {
+      monitorGraphStream()
+      monitorHopStream()
+    }
   }
 
   function reconfigure(opts) {
