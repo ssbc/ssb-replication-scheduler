@@ -147,13 +147,12 @@ tape('dont request during db2 indexing', async (t) => {
 
   const originalEBTRequest = restartedAlice.ebt.request
   restartedAlice.ebt.request = function request(id, val) {
-    if (id === bob.id) {
-      if (val === true) {
-        t.fail('requested bob, who is blocked')
-      }
-    }
-    t.pass("alice requested:" + id + ", with:" + val)
-    originalEBTRequest.call(alice.ebt, id, val)
+    if (id === bob.id && val === true)
+      t.fail('requested bob, who is blocked')
+    else
+      t.pass("alice requested:" + id + ", with:" + val)
+
+    originalEBTRequest.call(restartedAlice.ebt, id, val)
   }
 
   await sleep(500)
