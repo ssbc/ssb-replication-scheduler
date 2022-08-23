@@ -136,6 +136,7 @@ tape('dont request during db2 indexing', async (t) => {
     type: 'contact',
     contact: bob.id,
     blocking: true,
+    recps: [alice.id]
   })
   t.pass('published block')
 
