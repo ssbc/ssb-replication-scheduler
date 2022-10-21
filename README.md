@@ -160,33 +160,26 @@ the template is `null` or a falsy value, then it means that for that hops level
 we don't do partial replication and we **will** do **full** replication (which
 means pre-2022 SSB replication of the peer's `main` feed).
 
-When the template is a JSON tree of objects and arrays, where the root of the
-tree is always the _root meta feed_. The template describes which **keys** in
-the metafeeds and subfeeds must match exactly the **values** given. So that if
-we write `feedpurposes: 'indexes'`, it means we are interested in matching the
-metafeed that has the field `feedpurposes` exactly matching the value "indexes".
-All specified fields must match, but omitted fields are allowed to be any value.
-
-The field `subfeeds` is not matching an actual field, instead, it is assumes we
-are dealing with a meta feed and this is describing its subfeeds that we would
-like to replicate.
+When the template is a JSON array, it means we want to replicate only some leaf
+feeds in the "metafeed tree", where the root of the tree is always the
+_root meta feed_. The structure of the tree is assumed to follow the
+["tree structure v1"](https://github.com/ssbc/ssb-meta-feeds-spec#v1), which
+means we're only concerned about the leaf feeds. The template describes which
+**keys** in a leaf feed must match exactly the **values** given for that leaf to
+be replicated. So that if we write `feedpurpose: 'indexes'`, it means we are
+interested in matching the leaf subfeed that has the field `feedpurpose` exactly
+matching the value "indexes". All *specified* fields must match, but *omitted*
+fields are allowed to be any value.
 
 #### Special variables
 
-Some keys and some values are special, in the sense that they are not taken
-literally, but are going to be substituted by other context-relative values.
-These special variables are always prefixed with **`$`**.
+Some values are special, in the sense that they are not taken literally, but are
+going to be substituted by other context-relative values. These special
+variables are always prefixed with **`$`**.
 
-- Special keys
-  - `$format`
 - Special values
   - `$main`
   - `$root`
-
-The field _key_ `$format` refers to [ssb-ebt](https://github.com/ssbc/ssb-ebt)
-"replication formats" and can be included in a template to specify which
-replication format to use in ssb-ebt. The value of this field should be the
-format's name as a string.
 
 If the value of a field, e.g. in ssb-ql-0 queries, are the special strings
 `"$main"` or `"$root"`, then they respectively refer to the IDs of the _main
@@ -202,97 +195,66 @@ In the example below, we set up partial replication with the meaning:
 
 ```js
 partialReplication: {
-  0: {
-    subfeeds: [
-      { feedpurpose: 'coolgame' },
-      { feedpurpose: 'git-ssb' },
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            $format: 'indexed',
-          },
-        ],
-      },
-    ],
-  },
+  0: [
+    { purpose: 'coolgame' },
+    { purpose: 'git-ssb' },
+    { purpose: 'index' }
+  ],
 
-  1: {
-    subfeeds: [
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: null, private: true },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'post', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'vote', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'about', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'contact', private: false },
-            },
-            $format: 'indexed',
-          },
-        ],
+  1: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: null, private: true },
       },
-    ],
-  },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'post', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'vote', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'contact', private: false },
+      },
+    },
+  ],
 
-  2: {
-    subfeeds: [
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'about', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'contact', private: false },
-            },
-            $format: 'indexed',
-          },
-        ],
+  2: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
       },
-    ],
-  },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'contact', private: false },
+      },
+    },
+  ],
 }
 ```
 

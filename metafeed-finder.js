@@ -43,11 +43,11 @@ module.exports = class MetafeedFinder {
       const metaFeedId = this._map.get(mainFeedId)
       cb(null, metaFeedId)
     } else if (mainFeedId === this._ssb.id) {
-      this._ssb.metafeeds.getRoot((err, rootMF) => {
+      this._ssb.metafeeds.findOrCreate((err, rootMF) => {
         if (err) cb(err)
         else if (!rootMF) cb(null, null)
         else {
-          const metaFeedId = rootMF.keys.id
+          const metaFeedId = rootMF.id
           this._map.set(mainFeedId, metaFeedId)
           this._inverseMap.set(metaFeedId, mainFeedId)
           cb(null, metaFeedId)
@@ -223,7 +223,7 @@ module.exports = class MetafeedFinder {
     this._requestsByMainfeedId.clear()
 
     await this._forEachNeighborPeer((rpc, goToNextNeighbor) => {
-      debug('"getSubset" on peer %s for metafeed/announce messages', rpc.id)
+      debug('"getSubset" for peer %s for metafeed/announce messages', rpc.id)
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
         pull.filter((value) => this._validateMetafeedAnnounce({ value })),
