@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2021 Andre 'Staltz' Medeiros
+SPDX-FileCopyrightText: 2021-2022 Andre 'Staltz' Medeiros
 
 SPDX-License-Identifier: CC0-1.0
 -->
@@ -17,7 +17,7 @@ Depends on ssb-friends APIs, and calls ssb-ebt APIs.
 - Requires **Node.js 10** or higher
 - Requires **ssb-db** or **ssb-db2**
 - Requires [**ssb-friends**](https://github.com/ssbc/ssb-friends) version **5.0** or higher
-- Requires [**ssb-ebt**](https://github.com/ssbc/ssb-ebt) version **7.0** or higher
+- Requires [**ssb-ebt**](https://github.com/ssbc/ssb-ebt) version **9.0** or higher
 
 ```
 npm install --save ssb-replication-scheduler
@@ -164,12 +164,15 @@ When the template is a JSON array, it means we want to replicate only some leaf
 feeds in the "metafeed tree", where the root of the tree is always the
 _root meta feed_. The structure of the tree is assumed to follow the
 ["tree structure v1"](https://github.com/ssbc/ssb-meta-feeds-spec#v1), which
-means we're only concerned about the leaf feeds. The template describes which
-**keys** in a leaf feed must match exactly the **values** given for that leaf to
-be replicated. So that if we write `feedpurpose: 'indexes'`, it means we are
-interested in matching the leaf subfeed that has the field `feedpurpose` exactly
-matching the value "indexes". All *specified* fields must match, but *omitted*
-fields are allowed to be any value.
+means we're only concerned about the leaf feeds.
+
+Each item in the template should be an object describing which **keys** in a
+leaf feed must match exactly the **values** given for that leaf to be
+replicated. So that if we write `{purpose: 'git-ssb'}`, it means we are
+interested in matching the leaf feed that has the field `purpose` exactly
+matching the value "git-ssb". All *specified* fields must match, but *omitted*
+fields are allowed to be any value. If you omit all the fields, i.e. if you pass
+the empty object `{}`, then this means "replicate **ALL** leaf feeds".
 
 #### Special variables
 
@@ -196,6 +199,7 @@ In the example below, we set up partial replication with the meaning:
 ```js
 partialReplication: {
   0: [
+    { purpose: 'main' },
     { purpose: 'coolgame' },
     { purpose: 'git-ssb' },
     { purpose: 'index' }
@@ -252,6 +256,16 @@ partialReplication: {
       metadata: {
         querylang: 'ssb-ql-0',
         query: { author: '$main', type: 'contact', private: false },
+      },
+    },
+  ],
+
+  3: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
       },
     },
   ],
