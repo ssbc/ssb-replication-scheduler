@@ -46,11 +46,12 @@ module.exports = class Template {
   }
 
   _matchShard(rootMF, shardMF) {
-    if (this._leafShapes.some(isEmptyObject)) return true
-    const wantedShards = this._leafShapes.map((leaf) =>
-      pickShard(rootMF.id, leaf.purpose)
-    )
-    return wantedShards.includes(shardMF.purpose)
+    return this._leafShapes.some((leaf) => {
+      if (isEmptyObject(leaf)) return true
+
+      const shardPurpose = pickShard(rootMF.id, leaf.purpose)
+      return shardPurpose === shardMF.purpose
+    })
   }
 
   _matchLeaf(leafFeed, rootID, mainID) {
