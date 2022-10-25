@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2021 Andre 'Staltz' Medeiros
+SPDX-FileCopyrightText: 2021-2022 Andre 'Staltz' Medeiros
 
 SPDX-License-Identifier: CC0-1.0
 -->
@@ -17,7 +17,7 @@ Depends on ssb-friends APIs, and calls ssb-ebt APIs.
 - Requires **Node.js 10** or higher
 - Requires **ssb-db** or **ssb-db2**
 - Requires [**ssb-friends**](https://github.com/ssbc/ssb-friends) version **5.0** or higher
-- Requires [**ssb-ebt**](https://github.com/ssbc/ssb-ebt) version **7.0** or higher
+- Requires [**ssb-ebt**](https://github.com/ssbc/ssb-ebt) version **9.0** or higher
 
 ```
 npm install --save ssb-replication-scheduler
@@ -160,33 +160,29 @@ the template is `null` or a falsy value, then it means that for that hops level
 we don't do partial replication and we **will** do **full** replication (which
 means pre-2022 SSB replication of the peer's `main` feed).
 
-When the template is a JSON tree of objects and arrays, where the root of the
-tree is always the _root meta feed_. The template describes which **keys** in
-the metafeeds and subfeeds must match exactly the **values** given. So that if
-we write `feedpurposes: 'indexes'`, it means we are interested in matching the
-metafeed that has the field `feedpurposes` exactly matching the value "indexes".
-All specified fields must match, but omitted fields are allowed to be any value.
+When the template is a JSON array, it means we want to replicate only some leaf
+feeds in the "metafeed tree", where the root of the tree is always the
+_root meta feed_. The structure of the tree is assumed to follow the
+["tree structure v1"](https://github.com/ssbc/ssb-meta-feeds-spec#v1), which
+means we're only concerned about the leaf feeds.
 
-The field `subfeeds` is not matching an actual field, instead, it is assumes we
-are dealing with a meta feed and this is describing its subfeeds that we would
-like to replicate.
+Each item in the template should be an object describing which **keys** in a
+leaf feed must match exactly the **values** given for that leaf to be
+replicated. So that if we write `{purpose: 'git-ssb'}`, it means we are
+interested in matching the leaf feed that has the field `purpose` exactly
+matching the value "git-ssb". All *specified* fields must match, but *omitted*
+fields are allowed to be any value. If you omit all the fields, i.e. if you pass
+the empty object `{}`, then this means "replicate **ALL** leaf feeds".
 
 #### Special variables
 
-Some keys and some values are special, in the sense that they are not taken
-literally, but are going to be substituted by other context-relative values.
-These special variables are always prefixed with **`$`**.
+Some values are special, in the sense that they are not taken literally, but are
+going to be substituted by other context-relative values. These special
+variables are always prefixed with **`$`**.
 
-- Special keys
-  - `$format`
 - Special values
   - `$main`
   - `$root`
-
-The field _key_ `$format` refers to [ssb-ebt](https://github.com/ssbc/ssb-ebt)
-"replication formats" and can be included in a template to specify which
-replication format to use in ssb-ebt. The value of this field should be the
-format's name as a string.
 
 If the value of a field, e.g. in ssb-ql-0 queries, are the special strings
 `"$main"` or `"$root"`, then they respectively refer to the IDs of the _main
@@ -202,97 +198,77 @@ In the example below, we set up partial replication with the meaning:
 
 ```js
 partialReplication: {
-  0: {
-    subfeeds: [
-      { feedpurpose: 'coolgame' },
-      { feedpurpose: 'git-ssb' },
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            $format: 'indexed',
-          },
-        ],
-      },
-    ],
-  },
+  0: [
+    { purpose: 'main' },
+    { purpose: 'coolgame' },
+    { purpose: 'git-ssb' },
+    { purpose: 'index' }
+  ],
 
-  1: {
-    subfeeds: [
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: null, private: true },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'post', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'vote', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'about', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'contact', private: false },
-            },
-            $format: 'indexed',
-          },
-        ],
+  1: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: null, private: true },
       },
-    ],
-  },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'post', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'vote', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
+      },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'contact', private: false },
+      },
+    },
+  ],
 
-  2: {
-    subfeeds: [
-      {
-        feedpurpose: 'indexes',
-        subfeeds: [
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'about', private: false },
-            },
-            $format: 'indexed',
-          },
-          {
-            feedpurpose: 'index',
-            metadata: {
-              querylang: 'ssb-ql-0',
-              query: { author: '$main', type: 'contact', private: false },
-            },
-            $format: 'indexed',
-          },
-        ],
+  2: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
       },
-    ],
-  },
+    },
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'contact', private: false },
+      },
+    },
+  ],
+
+  3: [
+    {
+      purpose: 'index',
+      metadata: {
+        querylang: 'ssb-ql-0',
+        query: { author: '$main', type: 'about', private: false },
+      },
+    },
+  ],
 }
 ```
 

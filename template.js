@@ -3,117 +3,103 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const { QL0 } = require('ssb-subset-ql')
+const pickShard = require('ssb-meta-feeds/pick-shard')
+
+function isEmptyObject(obj) {
+  return Object.keys(obj).length === 0
+}
 
 /**
  * Algorithms for the "replication template" object from the SSB config.
  */
 module.exports = class Template {
-  constructor(node) {
-    this._rootNode = node
+  constructor(leafShapes) {
+    /** @type Array{*} */
+    this._leafShapes = leafShapes
   }
 
   hasIndexLeaf() {
-    const indexes = this._find(
-      this._rootNode,
-      (node) => node.feedpurpose === 'indexes'
-    )
-    if (!indexes) return false
-    const leaf = this._find(indexes, (node) => node['$format'] === 'indexed')
-    return !!leaf
-  }
-
-  _find(node, fn) {
-    if (!node) return null
-    if (fn(node)) return node
-
-    if (node.subfeeds && Array.isArray(node.subfeeds)) {
-      for (const childNode of node.subfeeds) {
-        if (this._find(childNode, fn)) {
-          return childNode
-        }
-      }
-    }
+    return this._leafShapes.some((shape) => shape && shape.purpose === 'index')
   }
 
   matchBranch(branch, mainFeedId) {
-    return this._matchBranch(branch, this._rootNode, mainFeedId)
+    return this._matchBranch(branch, mainFeedId)
   }
 
-  _matchBranch(branch, node, mainFeedId) {
-    if (branch.length === 0) return null
-    const head = branch[0]
-    const [feedId, details] = head
-
-    // Head is a root meta feed:
-    if (!details) {
-      const keys = Object.keys(node)
-      const rootMatches =
-        keys.length === 1 &&
-        keys[0] === 'subfeeds' &&
-        Array.isArray(node.subfeeds)
-
-      if (!rootMatches) {
-        return null
-      } else if (branch.length >= 2) {
-        const childBranch = branch.slice(1)
-        for (const childNode of node.subfeeds) {
-          const matched = this._matchBranch(childBranch, childNode, mainFeedId)
-          if (matched) return matched
-        }
-        return null
-      } else {
-        return node
-      }
+  _matchBranch(branch, mainFeedId) {
+    if (!branch || !Array.isArray(branch)) return false
+    const [rootMF, v1MF, shardMF, leafFeed] = branch
+    switch (branch.length) {
+      case 0:
+        return false
+      case 1:
+        return true
+      case 2:
+        return true
+      case 3:
+        return this._matchShard(rootMF, shardMF)
+      case 4:
+        return this._matchLeaf(leafFeed, rootMF.id, mainFeedId)
+      default:
+        return false
     }
+  }
 
-    // Head is a subfeed:
-    if (details) {
-      // If present, feedpurpose must match
-      if (node.feedpurpose && details.feedpurpose !== node.feedpurpose) {
-        return null
+  _matchShard(rootMF, shardMF) {
+    return this._leafShapes.some((leaf) => {
+      if (isEmptyObject(leaf)) return true
+
+      const shardPurpose = pickShard(rootMF.id, leaf.purpose)
+      return shardPurpose === shardMF.purpose
+    })
+  }
+
+  _matchLeaf(leafFeed, rootID, mainID) {
+    return this._leafShapes.some((shape) => {
+      // Empty shape means "accept any leaf"
+      if (isEmptyObject(shape)) return true
+
+      // If present, purpose must match
+      if (leafFeed.purpose !== shape.purpose) {
+        return false
       }
 
       // If present, metadata must match
-      if (node.metadata && details.metadata) {
+      if (shape.metadata && leafFeed.metadata) {
         // If querylang is present, match ssb-ql-0 queries
-        if (node.metadata.querylang !== details.metadata.querylang) {
-          return null
+        if (shape.metadata.querylang !== leafFeed.metadata.querylang) {
+          return false
         }
-        if (node.metadata.querylang === 'ssb-ql-0') {
-          if (!QL0.parse(details.metadata.query)) return null
-          if (node.metadata.query) {
-            const nodeQuery = { ...node.metadata.query }
-            if (nodeQuery.author === '$main') nodeQuery.author = mainFeedId
-            if (!QL0.isEquals(details.metadata.query, nodeQuery)) {
-              return null
+        if (shape.metadata.querylang === 'ssb-ql-0') {
+          if (!QL0.parse(leafFeed.metadata.query)) return false
+          if (shape.metadata.query) {
+            const shapeQuery = { ...shape.metadata.query }
+            if (shapeQuery.author === '$main') shapeQuery.author = mainID
+            if (shapeQuery.author === '$root') shapeQuery.author = rootID
+            if (!QL0.isEquals(shapeQuery, leafFeed.metadata.query)) {
+              return false
             }
           }
         }
 
         // Any other metadata field must match exactly
-        for (const field of Object.keys(node.metadata)) {
+        for (const field of Object.keys(shape.metadata)) {
           // Ignore these because we already handled them:
           if (field === 'query') continue
           if (field === 'querylang') continue
 
-          if (details.metadata[field] !== node.metadata[field]) {
-            return null
+          if (typeof shape.metadata[field] === 'string') {
+            const fieldValue = shape.metadata[field]
+              .replace('$main', mainID)
+              .replace('$root', rootID)
+            if (fieldValue !== leafFeed.metadata[field]) return false
+          } else if (shape.metadata[field] !== leafFeed.metadata[field]) {
+            return false
           }
         }
       }
 
-      if (Array.isArray(node.subfeeds) && branch.length >= 2) {
-        const childBranch = branch.slice(1)
-        for (const childNode of node.subfeeds) {
-          const matched = this._matchBranch(childBranch, childNode, mainFeedId)
-          if (matched) return matched
-        }
-        return null
-      } else {
-        return node
-      }
-    }
-
-    return null
+      return true
+    })
   }
 }

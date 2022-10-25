@@ -98,7 +98,7 @@ module.exports = class RequestManager {
       .filter((x) => x >= 0)
     const templates = new Map()
     for (const hops of hopsArr) {
-      if (optsPartialReplication[hops]) {
+      if (Array.isArray(optsPartialReplication[hops])) {
         templates.set(hops, new Template(optsPartialReplication[hops]))
       } else {
         templates.set(hops, null)
@@ -174,8 +174,8 @@ module.exports = class RequestManager {
       pull(
         this._ssb.metafeeds.branchStream(opts),
         (this._tombstonedBranchDrainer = pull.drain((branch) => {
-          const [leafId] = branch[branch.length - 1]
-          this._tombstone(leafId, true)
+          const leaf = branch[branch.length - 1]
+          this._tombstone(leaf.id, true)
         }))
       )
     }
@@ -210,45 +210,59 @@ module.exports = class RequestManager {
     return template.matchBranch(branch, mainFeedId)
   }
 
+  /**
+   * Validation according to metafeeds tree structure v1
+   */
+  _isValidBranch(branch) {
+    if (!Array.isArray(branch)) return false
+    if (branch.length <= 0 || branch.length > 4) return false
+    const [root, v1, shard] = branch
+    if (root.purpose !== 'root') return false
+    if (branch.length === 1) return true
+    if (v1.purpose !== 'v1') return false
+    if (branch.length === 2) return true
+    if (shard.purpose.length !== 1) return false
+    return true
+  }
+
   _handleBranch(branch) {
     const root = branch[0]
     const leaf = branch[branch.length - 1]
-    const metaFeedId = root[0]
-    const mainFeedId = this._metafeedFinder.getInverse(metaFeedId)
+    const mainFeedId = this._metafeedFinder.getInverse(root.id)
     if (!mainFeedId) return
-    const subfeed = leaf[0]
+    if (!this._isValidBranch(branch)) return
 
     if (this._requestedPartially.has(mainFeedId)) {
       const hops = this._requestedPartially.get(mainFeedId)
       const matchedNode = this._matchBranchWith(hops, branch, mainFeedId)
       if (!matchedNode) return
-      this._request(subfeed, hops, matchedNode['$format'])
+      this._request(leaf.id, hops)
       return
     }
 
-    // Unrequest subfeed if main feed was unrequested
+    // Unrequest leaf feed if main feed was unrequested
     if (this._unrequested.has(mainFeedId)) {
       const prevHops = this._unrequested.get(mainFeedId)
       if (prevHops === null) {
-        this._unrequest(subfeed)
+        this._unrequest(leaf.id)
         return
       }
       const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
       if (!matchedNode) return
-      this._unrequest(subfeed, matchedNode['$format'])
+      this._unrequest(leaf.id)
       return
     }
 
-    // Block subfeed if main feed was blocked
+    // Block leaf feed if main feed was blocked
     if (this._blocked.has(mainFeedId)) {
       const prevHops = this._blocked.get(mainFeedId)
       if (prevHops === null) {
-        this._block(subfeed)
+        this._block(leaf.id)
         return
       }
       const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
       if (!matchedNode) return
-      this._block(subfeed, matchedNode['$format'])
+      this._block(leaf.id)
       return
     }
   }
@@ -300,7 +314,7 @@ module.exports = class RequestManager {
     }
   }
 
-  _request(feedId, hops = null, ebtFormat = undefined) {
+  _request(feedId, hops = null) {
     if (this._requested.has(feedId)) return
     debug('will replicate %s', feedId)
 
@@ -309,11 +323,11 @@ module.exports = class RequestManager {
       this._requestables.delete(feedId)
     }
     this._requested.set(feedId, hops)
-    this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
-    this._ssb.ebt.request(feedId, true, ebtFormat)
+    this._ssb.ebt.block(this._ssb.id, feedId, false)
+    this._ssb.ebt.request(feedId, true)
   }
 
-  _unrequest(feedId, ebtFormat = undefined) {
+  _unrequest(feedId) {
     if (this._unrequested.has(feedId)) return
     debug('will stop replicating %s', feedId)
 
@@ -322,8 +336,8 @@ module.exports = class RequestManager {
     this._requested.delete(feedId)
     this._requestedPartially.delete(feedId)
     this._unrequested.set(feedId, hops)
-    this._ssb.ebt.request(feedId, false, ebtFormat)
-    this._ssb.ebt.block(this._ssb.id, feedId, false, ebtFormat)
+    this._ssb.ebt.request(feedId, false)
+    this._ssb.ebt.block(this._ssb.id, feedId, false)
 
     if (this._templates) {
       // Weave through all of the subfeeds and unrequest them too
@@ -337,7 +351,7 @@ module.exports = class RequestManager {
     }
   }
 
-  _block(feedId, ebtFormat = undefined) {
+  _block(feedId) {
     if (this._blocked.has(feedId)) return
     debug('will block replication of %s', feedId)
 
@@ -346,8 +360,8 @@ module.exports = class RequestManager {
     this._requested.delete(feedId)
     this._requestedPartially.delete(feedId)
     this._blocked.set(feedId, hops)
-    this._ssb.ebt.request(feedId, false, ebtFormat)
-    this._ssb.ebt.block(this._ssb.id, feedId, true, ebtFormat)
+    this._ssb.ebt.request(feedId, false)
+    this._ssb.ebt.block(this._ssb.id, feedId, true)
 
     if (this._templates) {
       // Weave through all of the subfeeds and block them too
@@ -378,8 +392,8 @@ module.exports = class RequestManager {
       pull(
         this._ssb.metafeeds.branchStream(opts),
         pull.drain((branch) => {
-          const [leafId] = branch[branch.length - 1]
-          this._tombstone(leafId, false)
+          const leaf = branch[branch.length - 1]
+          this._tombstone(leaf.id, false)
         })
       )
     }
