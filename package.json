@@ -24,7 +24,7 @@
     "pull-stream": "^3.6.0",
     "ssb-db2": ">=3.0.0 <=6",
     "ssb-ebt": "^9.1.2",
-    "ssb-meta-feeds": "ssbc/ssb-meta-feeds#fix-tombstone-details",
+    "ssb-meta-feeds": "~0.35.2",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.0"
   },
