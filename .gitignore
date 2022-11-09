@@ -6,3 +6,5 @@
 /pnpm-lock
 /.nyc_output
 /coverage
+
+package-lock.json
