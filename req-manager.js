@@ -18,6 +18,10 @@ module.exports = class RequestManager {
     this._opts = opts
     this._metafeedFinder = new MetafeedFinder(ssb, opts, BATCH_LIMIT)
     this._period =
+      // debouncePeriod basically controls how often will we trigger
+      // ssb.ebt.request() calls. We trigger those when the
+      // requestManager.add() has "calmed down", i.e. after debouncePeriod
+      // milliseconds have passed in which add() was not called.
       typeof opts.debouncePeriod === 'number'
         ? opts.debouncePeriod
         : DEFAULT_PERIOD
