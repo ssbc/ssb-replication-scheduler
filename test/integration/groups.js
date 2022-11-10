@@ -2,6 +2,7 @@ const test = require('tape')
 const rimraf = require('rimraf')
 const SecretStack = require('secret-stack')
 const caps = require('ssb-caps')
+const ssbKeys = require('ssb-keys')
 const p = require('promisify-4loc')
 const u = require('../misc/util')
 
@@ -16,17 +17,18 @@ const Server = (name, opts = {}) => {
     .use(require('ssb-conn'))
     .use(require('ssb-ebt'))
     .use(require('ssb-friends'))
+    .use(require('ssb-tribes2'))
     .use(require('ssb-meta-feeds'))
     .use(require('ssb-subset-rpc'))
     .use(require('ssb-index-feeds'))
-    .use(require('ssb-tribes2'))
     .use(require('../..'))({
     path,
+    keys: ssbKeys.generate(),
     ...opts,
   })
 }
 
-test('You replicate other people in a group', async (t) => {
+test.only('You replicate other people in a group', async (t) => {
   const alice = Server('alice', {
     friends: {
       hops: 1,
@@ -60,4 +62,14 @@ test('You replicate other people in a group', async (t) => {
   ])
 
   const group = await alice.tribes2.create()
+
+  await alice.tribes2.addMembers(group.id, [bob.id, carol.id])
+
+  // todo replicate
+
+  const carolHi = await carol.tribes2.publish({ text: 'hi', recps: [group.id] })
+
+  // todo connect bob and carol
+
+  bob.db.get(carolHi.key)
 })

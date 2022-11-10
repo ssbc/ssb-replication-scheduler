@@ -73,6 +73,10 @@ module.exports = class RequestManager {
     }
   }
 
+  addGroupMember() {
+    this._myGroupSecrets
+  }
+
   reconfigure(opts) {
     this._opts = { ...this._opts, ...opts }
     this._period =
@@ -100,6 +104,7 @@ module.exports = class RequestManager {
     const hopsArr = Object.keys(optsPartialReplication)
       .map(Number)
       .filter((x) => x >= 0)
+    const group = optsPartialReplication.group
     const templates = new Map()
     for (const hops of hopsArr) {
       if (Array.isArray(optsPartialReplication[hops])) {
@@ -107,6 +112,9 @@ module.exports = class RequestManager {
       } else {
         templates.set(hops, null)
       }
+    }
+    if (group) {
+      templates.set('group', new Template(group))
     }
     return templates
   }
@@ -210,8 +218,18 @@ module.exports = class RequestManager {
 
   _matchBranchWith(hops, branch, mainFeedId) {
     const template = this._findTemplateForHops(hops)
-    if (!template) return
-    return template.matchBranch(branch, mainFeedId)
+    const groupTemplate = this._templates.get('group')
+    if (
+      template &&
+      template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
+    )
+      return true
+    if (
+      groupTemplate &&
+      groupTemplate.matchBranch(branch, mainFeedId, this._myGroupSecrets)
+    )
+      return true
+    return false
   }
 
   /**

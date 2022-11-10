@@ -27,7 +27,7 @@
     "ssb-meta-feeds": "~0.35.2",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.0",
-    "ssb-tribes2": "ssbc/ssb-tribes2"
+    "ssb-tribes2": "ssbc/ssb-tribes2#meta-feeds2"
   },
   "devDependencies": {
     "c8": "^7.12.0",

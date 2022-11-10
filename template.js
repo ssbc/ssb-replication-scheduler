@@ -54,29 +54,34 @@ module.exports = class Template {
     })
   }
 
-  _matchLeaf(leafFeed, rootID, mainID) {
+  _matchLeaf(leafFeedDetails, rootID, mainID) {
     return this._leafShapes.some((shape) => {
       // Empty shape means "accept any leaf"
       if (isEmptyObject(shape)) return true
 
+      if (shape.purpose === '$groupSecret') {
+        if (!mygroupsecrets.has(leafFeedDetails.purpose)) {
+          return false
+        }
+      }
       // If present, purpose must match
-      if (leafFeed.purpose !== shape.purpose) {
+      else if (leafFeedDetails.purpose !== shape.purpose) {
         return false
       }
 
       // If present, metadata must match
-      if (shape.metadata && leafFeed.metadata) {
+      if (shape.metadata && leafFeedDetails.metadata) {
         // If querylang is present, match ssb-ql-0 queries
-        if (shape.metadata.querylang !== leafFeed.metadata.querylang) {
+        if (shape.metadata.querylang !== leafFeedDetails.metadata.querylang) {
           return false
         }
         if (shape.metadata.querylang === 'ssb-ql-0') {
-          if (!QL0.parse(leafFeed.metadata.query)) return false
+          if (!QL0.parse(leafFeedDetails.metadata.query)) return false
           if (shape.metadata.query) {
             const shapeQuery = { ...shape.metadata.query }
             if (shapeQuery.author === '$main') shapeQuery.author = mainID
             if (shapeQuery.author === '$root') shapeQuery.author = rootID
-            if (!QL0.isEquals(shapeQuery, leafFeed.metadata.query)) {
+            if (!QL0.isEquals(shapeQuery, leafFeedDetails.metadata.query)) {
               return false
             }
           }
@@ -92,8 +97,10 @@ module.exports = class Template {
             const fieldValue = shape.metadata[field]
               .replace('$main', mainID)
               .replace('$root', rootID)
-            if (fieldValue !== leafFeed.metadata[field]) return false
-          } else if (shape.metadata[field] !== leafFeed.metadata[field]) {
+            if (fieldValue !== leafFeedDetails.metadata[field]) return false
+          } else if (
+            shape.metadata[field] !== leafFeedDetails.metadata[field]
+          ) {
             return false
           }
         }

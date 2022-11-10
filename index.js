@@ -26,6 +26,9 @@ exports.init = function (ssb, config) {
       'ssb-replication-scheduler expects ssb-friends to be installed'
     )
   }
+  //if (!ssb.tribes2) {
+  //  throw new Error('I expect tribes2')
+  //}
 
   const opts = config.replicationScheduler || DEFAULT_OPTS
   const requestManager = new RequestManager(ssb, opts)
@@ -66,6 +69,32 @@ exports.init = function (ssb, config) {
     )
   }
 
+  function monitorGroupMembersStream() {
+    //TODO add live arguments to tribes2
+
+    console.log('in fn')
+
+    setTimeout(() => {
+      console.log('in timeout')
+
+      if (!ssb.tribes2) return
+
+      console.log('starting')
+
+      setInterval(() => {
+        pull(
+          ssb.tribes2.list(),
+          pull.map((group) => ssb.tribes2.listMembers(group.id)),
+          pull.flatten(),
+          pull.unique(),
+          pull.collect((err, groupMembers) => {
+            console.log('groupMembers', groupMembers)
+          })
+        )
+      }, 500)
+    }, 500)
+  }
+
   function start() {
     if (started) return
     started = true
@@ -83,11 +112,13 @@ exports.init = function (ssb, config) {
         } else {
           monitorGraphStream()
           monitorHopStream()
+          monitorGroupMembersStream()
         }
       }, true)
     } else {
       monitorGraphStream()
       monitorHopStream()
+      monitorGroupMembersStream()
     }
   }
 
