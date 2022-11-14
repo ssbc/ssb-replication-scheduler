@@ -52,7 +52,7 @@
     "ssb-friends": "^5.1.7",
     "ssb-index-feeds": "0.10.2",
     "ssb-keys": "^8.5.0",
-    "ssb-subset-rpc": "ssbc/ssb-subset-rpc",
+    "ssb-subset-rpc": "^0.3.6",
     "tap-arc": "~0.3.5",
     "tape": "^5.5.2"
   },
