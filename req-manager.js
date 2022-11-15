@@ -75,7 +75,7 @@ module.exports = class RequestManager {
   }
 
   addGroupMember(groupMemberId, groupSecret) {
-    console.log('groupMember', { groupMemberId, groupSecret })
+    //console.log('groupMember', { groupMemberId, groupSecret })
     this._myGroupSecrets.add(groupSecret.toString('base64'))
 
     const mainFeedId = this._metafeedFinder.getInverse(groupMemberId)

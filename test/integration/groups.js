@@ -3,14 +3,19 @@ const rimraf = require('rimraf')
 const SecretStack = require('secret-stack')
 const caps = require('ssb-caps')
 const ssbKeys = require('ssb-keys')
-const p = require('promisify-4loc')
+const bendyButtFormat = require('ssb-ebt/formats/bendy-butt')
+const p = require('util').promisify
 const u = require('../misc/util')
+const replicate = require('../../replicate')
+
+const sleep = p(setTimeout)
+const REPLICATION_TIMEOUT = 4e3
 
 const Server = (name, opts = {}) => {
   const path = `/tmp/ssb-replication-tests-${name}`
   rimraf.sync(path)
 
-  return SecretStack({ caps })
+  const sbot = SecretStack({ caps })
     .use(require('ssb-db2'))
     .use(require('ssb-db2/compat/ebt'))
     .use(require('ssb-bendy-butt'))
@@ -26,6 +31,26 @@ const Server = (name, opts = {}) => {
     keys: ssbKeys.generate(),
     ...opts,
   })
+
+  sbot.ebt.registerFormat(bendyButtFormat)
+
+  return sbot
+}
+
+async function waitUntilMember(person, groupId) {
+  let isMember = false
+  for (let i = 0; !isMember && i < 50; i++) {
+    await person.tribes2
+      .get(groupId)
+      .then(() => {
+        isMember = true
+      })
+      .catch(() => {})
+    await p(setTimeout)(100)
+  }
+  if (!isMember) {
+    throw new Error('Timed out waiting for person to be member of group')
+  }
 }
 
 test.only('You replicate other people in a group', async (t) => {
@@ -69,14 +94,22 @@ test.only('You replicate other people in a group', async (t) => {
   console.log('added members')
   console.log('alice is', alice.id)
 
-  // todo replicate
+  //await p(bob.connect)(alice.getAddress())
+  //await p(carol.connect)(alice.getAddress())
+  //await sleep(REPLICATION_TIMEOUT)
+  //await waitUntilMember(bob, group.id).catch(t.error)
+  //await waitUntilMember(carol, group.id).catch(t.error)
+  await replicate(bob, alice, { waitUntilMembersOf: group.id }).catch(t.error)
+  await replicate(carol, alice, { waitUntilMembersOf: group.id }).catch(t.error)
 
-  const carolHi = await carol.tribes2.publish({ text: 'hi', recps: [group.id] })
+  const carolHi = await carol.tribes2
+    .publish({ text: 'hi', recps: [group.id] })
+    .catch(t.error)
 
   console.log('carol published')
   // todo connect bob and carol
 
-  bob.db.get(carolHi.key)
+  await p(bob.db.get(carolHi.key)).catch(t.error)
 
   console.log('msg gotten')
   //TODO: test something
