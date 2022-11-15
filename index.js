@@ -32,6 +32,7 @@ exports.init = function (ssb, config) {
   let started = false
   let drainGraphStream = null
   let drainHopStream = null
+  let membersInterval = null
 
   if (opts.autostart === true || typeof opts.autostart === 'undefined') {
     start()
@@ -71,14 +72,25 @@ exports.init = function (ssb, config) {
 
     if (!ssb.tribes2) return
 
-    setInterval(() => {
+    if (membersInterval) clearInterval(membersInterval)
+    membersInterval = setInterval(() => {
       pull(
         ssb.tribes2.list(),
-        pull.map((group) => ssb.tribes2.listMembers(group.id)),
+        pull.map((group) =>
+          pull(
+            ssb.tribes2.listMembers(group.id),
+            pull.map((groupMemberId) => ({
+              groupSecret: group.secret,
+              groupMemberId,
+            }))
+          )
+        ),
         pull.flatten(),
-        pull.unique(),
-        pull.collect((err, groupMembers) => {
-          console.log('groupMembers', groupMembers)
+        pull.drain((member) => {
+          requestManager.addGroupMember(
+            member.groupMemberId,
+            member.groupSecret
+          )
         })
       )
     }, 500)

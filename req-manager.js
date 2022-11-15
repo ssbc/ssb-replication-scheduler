@@ -41,6 +41,7 @@ module.exports = class RequestManager {
     this._liveFinderDrainer = null
     this._hasCloseHook = false
     this._templates = this._setupTemplates(this._opts.partialReplication)
+    this._myGroupSecrets = new Set() // base64 encoded
 
     // If at least one hops template is configured, then setup ssb-ebt
     if (this._templates) {
@@ -73,8 +74,23 @@ module.exports = class RequestManager {
     }
   }
 
-  addGroupMember() {
-    this._myGroupSecrets
+  addGroupMember(groupMemberId, groupSecret) {
+    console.log('groupMember', { groupMemberId, groupSecret })
+    this._myGroupSecrets.add(groupSecret.toString('base64'))
+
+    const mainFeedId = this._metafeedFinder.getInverse(groupMemberId)
+    const hops = 100
+
+    //TODO: dedup from add()
+    this._requestables.delete(mainFeedId)
+    this._requested.delete(mainFeedId)
+    this._requestedPartially.delete(mainFeedId)
+    this._unrequested.delete(mainFeedId)
+    this._blocked.delete(mainFeedId)
+
+    this._requestables.set(mainFeedId, hops)
+    this._latestAdd = Date.now()
+    this._scheduleDebouncedFlush()
   }
 
   reconfigure(opts) {

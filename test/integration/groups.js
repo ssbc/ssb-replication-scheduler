@@ -61,15 +61,23 @@ test.only('You replicate other people in a group', async (t) => {
     p(carol.db.publish)(u.follow(alice.id)),
   ])
 
+  console.log('group creating')
   const group = await alice.tribes2.create()
 
+  console.log('group created')
   await alice.tribes2.addMembers(group.id, [bob.id, carol.id])
+  console.log('added members')
+  console.log('alice is', alice.id)
 
   // todo replicate
 
   const carolHi = await carol.tribes2.publish({ text: 'hi', recps: [group.id] })
 
+  console.log('carol published')
   // todo connect bob and carol
 
   bob.db.get(carolHi.key)
+
+  console.log('msg gotten')
+  //TODO: test something
 })

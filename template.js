@@ -22,11 +22,11 @@ module.exports = class Template {
     return this._leafShapes.some((shape) => shape && shape.purpose === 'index')
   }
 
-  matchBranch(branch, mainFeedId) {
-    return this._matchBranch(branch, mainFeedId)
+  matchBranch(branch, mainFeedId, myGroupSecrets) {
+    return this._matchBranch(branch, mainFeedId, myGroupSecrets)
   }
 
-  _matchBranch(branch, mainFeedId) {
+  _matchBranch(branch, mainFeedId, myGroupSecrets) {
     if (!branch || !Array.isArray(branch)) return false
     const [rootMF, v1MF, shardMF, leafFeed] = branch
     switch (branch.length) {
@@ -39,7 +39,7 @@ module.exports = class Template {
       case 3:
         return this._matchShard(rootMF, shardMF)
       case 4:
-        return this._matchLeaf(leafFeed, rootMF.id, mainFeedId)
+        return this._matchLeaf(leafFeed, rootMF.id, mainFeedId, myGroupSecrets)
       default:
         return false
     }
@@ -54,13 +54,13 @@ module.exports = class Template {
     })
   }
 
-  _matchLeaf(leafFeedDetails, rootID, mainID) {
+  _matchLeaf(leafFeedDetails, rootID, mainID, myGroupSecrets) {
     return this._leafShapes.some((shape) => {
       // Empty shape means "accept any leaf"
       if (isEmptyObject(shape)) return true
 
       if (shape.purpose === '$groupSecret') {
-        if (!mygroupsecrets.has(leafFeedDetails.purpose)) {
+        if (!myGroupSecrets.has(leafFeedDetails.purpose)) {
           return false
         }
       }
