@@ -24,10 +24,11 @@
     "pull-stream": "^3.6.0",
     "ssb-db2": ">=3.0.0 <=6",
     "ssb-ebt": "^9.1.2",
-    "ssb-meta-feeds": "~0.35.2",
+    "ssb-meta-feeds": "^0.38.0",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.1",
-    "ssb-tribes2": "ssbc/ssb-tribes2#meta-feeds2"
+    "ssb-tribes2": "ssbc/ssb-tribes2#meta-feeds2",
+    "ssb-box2": "^4.0.0"
   },
   "devDependencies": {
     "c8": "^7.12.0",
@@ -46,6 +47,8 @@
     "ssb-bendy-butt": "^1.0.1",
     "ssb-caps": "^1.1.0",
     "ssb-conn": "^6.0.4",
+    "ssb-classic": "^1.1.0",
+    "ssb-box": "^1.0.1",
     "ssb-db": "^20.4.0",
     "ssb-db2": "^6.2.8",
     "ssb-fixtures": "^3.0.4",

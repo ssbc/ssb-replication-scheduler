@@ -6,7 +6,7 @@ const ssbKeys = require('ssb-keys')
 const bendyButtFormat = require('ssb-ebt/formats/bendy-butt')
 const p = require('util').promisify
 const u = require('../misc/util')
-const replicate = require('../../replicate')
+const pull = require('pull-stream')
 
 const sleep = p(setTimeout)
 const REPLICATION_TIMEOUT = 4e3
@@ -16,9 +16,14 @@ const Server = (name, opts = {}) => {
   rimraf.sync(path)
 
   const sbot = SecretStack({ caps })
-    .use(require('ssb-db2'))
+    .use(require('ssb-db2/core'))
     .use(require('ssb-db2/compat/ebt'))
+    .use(require('ssb-db2/compat/publish'))
+    .use(require('ssb-db2/compat/post'))
+    .use(require('ssb-classic'))
     .use(require('ssb-bendy-butt'))
+    .use(require('ssb-box'))
+    .use(require('ssb-box2'))
     .use(require('ssb-conn'))
     .use(require('ssb-ebt'))
     .use(require('ssb-friends'))
@@ -32,7 +37,7 @@ const Server = (name, opts = {}) => {
     ...opts,
   })
 
-  sbot.ebt.registerFormat(bendyButtFormat)
+  //sbot.ebt.registerFormat(bendyButtFormat)
 
   return sbot
 }
@@ -58,6 +63,13 @@ test.only('You replicate other people in a group', async (t) => {
     friends: {
       hops: 1,
     },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'invitations' }],
+      },
+    },
   })
 
   const bob = Server('bob', {
@@ -67,7 +79,8 @@ test.only('You replicate other people in a group', async (t) => {
     replicationScheduler: {
       debouncePeriod: 1,
       partialReplication: {
-        1: [{ purpose: 'main' }],
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'invitations' }],
         group: [{ purpose: '$groupSecret' }],
       },
     },
@@ -77,7 +90,23 @@ test.only('You replicate other people in a group', async (t) => {
     friends: {
       hops: 1,
     },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'invitations' }],
+      },
+    },
   })
+
+  alice.tribes2.start()
+  bob.tribes2.start()
+  carol.tribes2.start()
+
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  console.log('found metafeeds')
 
   await Promise.all([
     p(alice.db.publish)(u.follow(bob.id)),
@@ -86,31 +115,64 @@ test.only('You replicate other people in a group', async (t) => {
     p(carol.db.publish)(u.follow(alice.id)),
   ])
 
+  console.log('replicating after follows')
+
+  await p(bob.connect)(alice.getAddress())
+  await p(carol.connect)(alice.getAddress())
+  await sleep(REPLICATION_TIMEOUT)
+  await sleep(REPLICATION_TIMEOUT)
+  //TODO: maybe close the connections at this point
+
   console.log('group creating')
   const group = await alice.tribes2.create()
 
   console.log('group created')
-  await alice.tribes2.addMembers(group.id, [bob.id, carol.id])
+  await alice.tribes2
+    .addMembers(group.id, [bobRoot.id, carolRoot.id])
+    .catch((err) => {
+      console.error('cant add members', err)
+      t.error(err)
+    })
   console.log('added members')
   console.log('alice is', alice.id)
 
-  //await p(bob.connect)(alice.getAddress())
-  //await p(carol.connect)(alice.getAddress())
-  //await sleep(REPLICATION_TIMEOUT)
-  //await waitUntilMember(bob, group.id).catch(t.error)
-  //await waitUntilMember(carol, group.id).catch(t.error)
-  await replicate(bob, alice, { waitUntilMembersOf: group.id }).catch(t.error)
-  await replicate(carol, alice, { waitUntilMembersOf: group.id }).catch(t.error)
+  await p(bob.connect)(alice.getAddress())
+  await p(carol.connect)(alice.getAddress())
+  await sleep(REPLICATION_TIMEOUT)
+  await waitUntilMember(bob, group.id).catch(t.error)
+  await waitUntilMember(carol, group.id).catch(t.error)
 
   const carolHi = await carol.tribes2
-    .publish({ text: 'hi', recps: [group.id] })
-    .catch(t.error)
+    .publish({ type: 'post', text: 'hi', recps: [group.id] })
+    .catch((err) => {
+      console.log('publish failed:', err)
+      t.error(err)
+    })
 
   console.log('carol published')
-  // todo connect bob and carol
 
-  await p(bob.db.get(carolHi.key)).catch(t.error)
+  await p(bob.connect)(carol.getAddress())
+  await sleep(REPLICATION_TIMEOUT)
+  await sleep(REPLICATION_TIMEOUT)
+  console.log('connected bob and carol')
+  console.log('trees')
+  await p(carol.metafeeds.printTree)(carolRoot.id, { id: true })
+  await p(bob.metafeeds.printTree)(carolRoot.id, { id: true })
+  //console.log(
+  //  'bob members',
+  //  await new Promise((res, rej) =>
+  //    pull(
+  //      bob.tribes2.listMembers(group.id),
+  //      pull.collect((err, authors) => {
+  //        if (err) return rej(err)
+  //        return res(authors)
+  //      })
+  //    )
+  //  )
+  //)
 
-  console.log('msg gotten')
+  const msg = await p(bob.db.get)(carolHi.key).catch(t.error)
+
+  console.log('msg gotten', msg)
   //TODO: test something
 })

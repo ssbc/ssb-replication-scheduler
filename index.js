@@ -87,13 +87,14 @@ exports.init = function (ssb, config) {
         ),
         pull.flatten(),
         pull.drain((member) => {
+          //console.log(ssb.id.slice(0, 5), 'groupMemberId', member.groupMemberId)
           requestManager.addGroupMember(
             member.groupMemberId,
             member.groupSecret
           )
         })
       )
-    }, 500)
+    }, 100)
   }
 
   function start() {
