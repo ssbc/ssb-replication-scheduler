@@ -58,7 +58,7 @@ async function waitUntilMember(person, groupId) {
   }
 }
 
-test.only('You replicate other people in a group', async (t) => {
+test('You replicate other people in a group', async (t) => {
   const alice = Server('alice', {
     friends: {
       hops: 1,
@@ -155,24 +155,18 @@ test.only('You replicate other people in a group', async (t) => {
   await sleep(REPLICATION_TIMEOUT)
   await sleep(REPLICATION_TIMEOUT)
   console.log('connected bob and carol')
-  console.log('trees')
-  await p(carol.metafeeds.printTree)(carolRoot.id, { id: true })
-  await p(bob.metafeeds.printTree)(carolRoot.id, { id: true })
-  //console.log(
-  //  'bob members',
-  //  await new Promise((res, rej) =>
-  //    pull(
-  //      bob.tribes2.listMembers(group.id),
-  //      pull.collect((err, authors) => {
-  //        if (err) return rej(err)
-  //        return res(authors)
-  //      })
-  //    )
-  //  )
-  //)
+  //console.log('trees')
+  //await p(carol.metafeeds.printTree)(carolRoot.id, { id: true })
+  //await p(bob.metafeeds.printTree)(carolRoot.id, { id: true })
 
   const msg = await p(bob.db.get)(carolHi.key).catch(t.error)
 
-  console.log('msg gotten', msg)
-  //TODO: test something
+  t.equals(msg.content.text, 'hi')
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+  t.end()
 })

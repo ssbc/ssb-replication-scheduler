@@ -238,6 +238,8 @@ module.exports = class RequestManager {
 
   _matchBranchWith(hopsOrGroup, branch, mainFeedId = null) {
     const template = this._findTemplateForHopsOrGroup(hopsOrGroup)
+    //if (hopsOrGroup === 'group')
+    //  console.log('template for branch', template, branch)
     if (
       template &&
       template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
@@ -277,10 +279,13 @@ module.exports = class RequestManager {
       return
     }
 
-    if (this._rootRequestedPartially.has(feedId)) {
+    if (this._rootRequestedPartially.has(root.id)) {
+      //if (branch.length === 4) console.log('long root branch', branch)
       const matchedNode = this._matchBranchWith('group', branch)
+      //if (branch.length === 3)
+      //  console.log('shard root branch', branch, matchedNode)
       if (!matchedNode) return
-      console.log('about to request branch', branch)
+      //console.log('about to request branch', branch)
       this._request(leaf.id)
       return
     }
@@ -375,7 +380,7 @@ module.exports = class RequestManager {
     pull(
       this._ssb.metafeeds.branchStream(opts),
       pull.drain((branch) => {
-        //if (branch.length === 2) console.log('a branch', branch)
+        //if (branch.length === 3) console.log('a branch', branch)
         this._handleBranch(branch)
       })
     )

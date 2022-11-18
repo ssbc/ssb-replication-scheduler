@@ -37,7 +37,7 @@ module.exports = class Template {
       case 2:
         return true
       case 3:
-        return this._matchShard(rootMF, shardMF)
+        return this._matchShard(rootMF, shardMF, myGroupSecrets)
       case 4:
         return this._matchLeaf(leafFeed, rootMF.id, mainFeedId, myGroupSecrets)
       default:
@@ -45,9 +45,15 @@ module.exports = class Template {
     }
   }
 
-  _matchShard(rootMF, shardMF) {
+  _matchShard(rootMF, shardMF, myGroupSecrets) {
     return this._leafShapes.some((leaf) => {
       if (isEmptyObject(leaf)) return true
+
+      if (leaf.purpose === '$groupSecret') {
+        return Array.from(myGroupSecrets)
+          .map((secretPurpose) => pickShard(rootMF.id, secretPurpose))
+          .includes(shardMF.purpose)
+      }
 
       const shardPurpose = pickShard(rootMF.id, leaf.purpose)
       return shardPurpose === shardMF.purpose
