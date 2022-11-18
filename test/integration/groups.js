@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 Jacob Karlsson
+//
+// SPDX-License-Identifier: Unlicense
+
 const test = require('tape')
 const rimraf = require('rimraf')
 const SecretStack = require('secret-stack')
