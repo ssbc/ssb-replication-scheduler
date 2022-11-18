@@ -26,7 +26,7 @@ module.exports = class Template {
     return this._matchBranch(branch, mainFeedId, myGroupSecrets)
   }
 
-  _matchBranch(branch, mainFeedId, myGroupSecrets) {
+  _matchBranch(branch, mainFeedId = null, myGroupSecrets) {
     if (!branch || !Array.isArray(branch)) return false
     const [rootMF, v1MF, shardMF, leafFeed] = branch
     switch (branch.length) {
@@ -54,7 +54,7 @@ module.exports = class Template {
     })
   }
 
-  _matchLeaf(leafFeedDetails, rootID, mainID, myGroupSecrets) {
+  _matchLeaf(leafFeedDetails, rootID, mainID = null, myGroupSecrets) {
     return this._leafShapes.some((shape) => {
       // Empty shape means "accept any leaf"
       if (isEmptyObject(shape)) return true

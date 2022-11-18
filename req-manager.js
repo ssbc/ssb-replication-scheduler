@@ -142,10 +142,11 @@ module.exports = class RequestManager {
     return [...this._templates.values()].filter((t) => !!t).some(fn)
   }
 
-  _findTemplateForHops(hops) {
+  _findTemplateForHopsOrGroup(hopsOrGroup) {
     if (!this._templates) return null
+    if (hopsOrGroup === 'group') return this._templates.get('group')
     const templateKeys = [...this._templates.keys()]
-    const eligibleHopsArr = templateKeys.filter((h) => h >= hops)
+    const eligibleHopsArr = templateKeys.filter((h) => h >= hopsOrGroup)
     const pickedHops =
       eligibleHopsArr.length > 0
         ? Math.min(...eligibleHopsArr)
@@ -234,17 +235,11 @@ module.exports = class RequestManager {
     }
   }
 
-  _matchBranchWith(hops, branch, mainFeedId) {
-    const template = this._findTemplateForHops(hops)
-    const groupTemplate = this._templates.get('group')
+  _matchBranchWith(hopsOrGroup, branch, mainFeedId = null) {
+    const template = this._findTemplateForHopsOrGroup(hopsOrGroup)
     if (
       template &&
       template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
-    )
-      return true
-    if (
-      groupTemplate &&
-      groupTemplate.matchBranch(branch, mainFeedId, this._myGroupSecrets)
     )
       return true
     return false
@@ -268,26 +263,31 @@ module.exports = class RequestManager {
   _handleBranch(branch) {
     const root = branch[0]
     const leaf = branch[branch.length - 1]
+    // this might be null but that's fine
     const mainFeedId = this._metafeedFinder.getInverse(root.id)
-    if (!mainFeedId) return
+    const feedId = mainFeedId || root.id
     if (!this._isValidBranch(branch)) return
 
-    if (this._requestedPartially.has(mainFeedId)) {
-      const hops = this._requestedPartially.get(mainFeedId)
-      const matchedNode = this._matchBranchWith(hops, branch, mainFeedId)
+    if (this._requestedPartially.has(feedId)) {
+      const hopsOrGroup = this._requestedPartially.get(feedId)
+      const matchedNode = this._matchBranchWith(hopsOrGroup, branch, mainFeedId)
       if (!matchedNode) return
-      this._request(leaf.id, hops)
+      this._request(leaf.id, hopsOrGroup)
       return
     }
 
-    // Unrequest leaf feed if main feed was unrequested
-    if (this._unrequested.has(mainFeedId)) {
-      const prevHops = this._unrequested.get(mainFeedId)
-      if (prevHops === null) {
+    // Unrequest leaf feed if feed was unrequested
+    if (this._unrequested.has(feedId)) {
+      const prevHopsOrGroup = this._unrequested.get(feedId)
+      if (prevHopsOrGroup === null) {
         this._unrequest(leaf.id)
         return
       }
-      const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
+      const matchedNode = this._matchBranchWith(
+        prevHopsOrGroup,
+        branch,
+        mainFeedId
+      )
       if (!matchedNode) return
       this._unrequest(leaf.id)
       return
@@ -364,7 +364,7 @@ module.exports = class RequestManager {
     pull(
       this._ssb.metafeeds.branchStream(opts),
       pull.drain((branch) => {
-        console.log('a branch', branch)
+        if (branch.length === 2) console.log('a branch', branch)
         this._handleBranch(branch)
       })
     )
@@ -503,7 +503,7 @@ module.exports = class RequestManager {
     pull(
       pull.values([...this._mainRequestables.entries()]),
       pull.asyncMap(([mainFeedId, hops], cb) => {
-        const template = this._findTemplateForHops(hops)
+        const template = this._findTemplateForHopsOrGroup(hops)
         if (!template) return cb(null, [mainFeedId, false])
 
         this._supportsPartialReplication(mainFeedId, (err, supports) => {
