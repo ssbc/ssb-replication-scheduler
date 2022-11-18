@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 Jacob Karlsson
+//
+// SPDX-License-Identifier: Unlicense
+
 module.exports = {
   env: {
     commonjs: true,
