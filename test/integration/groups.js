@@ -62,7 +62,7 @@ async function waitUntilMember(person, groupId) {
   }
 }
 
-test('You replicate other people in a group', async (t) => {
+test.only('You replicate other people in a group', async (t) => {
   const alice = Server('alice', {
     friends: {
       hops: 1,
@@ -167,10 +167,13 @@ test('You replicate other people in a group', async (t) => {
 
   t.equals(msg.content.text, 'hi')
 
+  console.log('msg', msg)
+
   await Promise.all([
     p(alice.close)(true),
     p(bob.close)(true),
     p(carol.close)(true),
   ])
-  t.end()
+  console.log('closed bots')
+  //t.end()
 })
