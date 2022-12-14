@@ -507,6 +507,7 @@ module.exports = class RequestManager {
     this._flushing = true
 
     const mainFlushables = pull(
+      pull.values([...this._requestableMains.entries()]),
       pull.asyncMap(([mainFeedId, hops], cb) => {
         const template = this._findTemplateForCategory(hops)
         if (!template) return cb(null, [mainFeedId, false])
