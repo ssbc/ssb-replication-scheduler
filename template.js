@@ -28,7 +28,7 @@ module.exports = class Template {
 
   _matchBranch(branch, mainFeedId = null, myGroupSecrets) {
     if (!branch || !Array.isArray(branch)) return false
-    const [rootMF, v1MF, shardMF, leafFeed] = branch
+    const [rootMF, , shardMF, leafFeed] = branch
     switch (branch.length) {
       case 0:
         return false

@@ -86,15 +86,13 @@ exports.init = function (ssb, config) {
           )
         ),
         pull.flatten(),
-        pull.drain((member) => {
+        pull.drain(({ groupMemberId, groupSecret }) => {
           //console.log(ssb.id.slice(0, 5), 'groupMemberId', member.groupMemberId)
-          requestManager.addGroupMember(
-            member.groupMemberId,
-            member.groupSecret
-          )
+          requestManager.addGroupMember(groupMemberId, groupSecret)
         })
       )
     }, 100)
+    if (membersInterval.unref) membersInterval.unref()
   }
 
   function start() {
