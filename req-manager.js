@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
+const cat = require('pull-cat')
 const debug = require('debug')('ssb:replication-scheduler')
 const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
@@ -33,8 +34,7 @@ module.exports = class RequestManager {
     this._unrequested = new Map() // feedId => hops when it used to be requested
     this._blocked = new Map() // feedId => hops before it was blocked
     this._tombstoned = new Set() // feedIds
-    this._flushingMain = false
-    this._flushingRoot = false
+    this._flushing = false
     this._wantsMoreFlushing = false
     this._latestAdd = 0
     this._timer = null
@@ -480,7 +480,7 @@ module.exports = class RequestManager {
   }
 
   _scheduleDebouncedFlush() {
-    if (this._flushingMain || this._flushingRoot) {
+    if (this._flushing) {
       this._wantsMoreFlushing = true
       return
     }
@@ -512,12 +512,9 @@ module.exports = class RequestManager {
   }
 
   _flush() {
-    this._flushingMain = true
-    this._flushingRoot = true
+    this._flushing = true
 
-    // Flush main feeds
-    pull(
-      pull.values([...this._requestableMains.entries()]),
+    const mainFlushables = pull(
       pull.asyncMap(([mainFeedId, hops], cb) => {
         const template = this._findTemplateForCategory(hops)
         if (!template) return cb(null, [mainFeedId, false])
@@ -527,43 +524,37 @@ module.exports = class RequestManager {
           else cb(null, [mainFeedId, supports])
         })
       }),
-      pull.drain(
-        ([mainFeedId, supportsMetafeedTree]) => {
-          if (supportsMetafeedTree) {
-            this._requestTreeFromMain(mainFeedId)
-          } else {
-            this._request(mainFeedId)
-          }
-        },
-        (err) => {
-          this._flushingMain = false
-          if (err) console.error(err)
-          if (this._templates) this._setupStreamDrainers()
-          if (this._wantsMoreFlushing) {
-            this._scheduleDebouncedFlush()
-          }
+      pull.map(([mainFeedId, supportsMetafeedTree]) => {
+        if (supportsMetafeedTree) {
+          this._requestTreeFromMain(mainFeedId)
+        } else {
+          this._request(mainFeedId)
         }
-      )
+        return null
+      })
     )
 
-    // Flush root feeds (to request group feeds)
-    if (this._templates.has('group')) {
-      pull(
-        pull.values([...this._requestableRoots.entries()]),
-        pull.drain(
-          ([rootFeedId]) => {
-            this._requestTreeFromRoot(rootFeedId)
-          },
-          (err) => {
-            this._flushingRoot = false
-            if (err) console.error(err)
-            if (this._templates) this._setupStreamDrainers()
-            if (this._wantsMoreFlushing) {
-              this._scheduleDebouncedFlush()
-            }
-          }
-        )
-      )
-    }
+    const rootFlushables =
+      this._templates && this._templates.has('group')
+        ? pull(
+            pull.values([...this._requestableRoots.entries()]),
+            pull.map(([rootFeedId]) => {
+              this._requestTreeFromRoot(rootFeedId)
+              return null
+            })
+          )
+        : pull.empty()
+
+    pull(
+      cat([mainFlushables, rootFlushables]),
+      pull.onEnd((err) => {
+        this._flushing = false
+        if (err) console.error(err)
+        if (this._templates) this._setupStreamDrainers()
+        if (this._wantsMoreFlushing) {
+          this._scheduleDebouncedFlush()
+        }
+      })
+    )
   }
 }

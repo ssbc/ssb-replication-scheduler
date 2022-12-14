@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "debug": "^4.3.2",
+    "pull-cat": "^1.1.11",
     "pull-pushable": "^2.2.0",
     "pull-stream": "^3.6.0",
     "ssb-db2": ">=3.0.0 <=6",
