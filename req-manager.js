@@ -121,9 +121,9 @@ module.exports = class RequestManager {
     if (!optsPartialReplication) return null
     if (Object.values(optsPartialReplication).every((t) => !t)) return null
     const hopsArr = Object.keys(optsPartialReplication)
+      .filter((x) => typeof x === 'number')
       .map(Number)
       .filter((x) => x >= 0)
-    const group = optsPartialReplication.group
     const templates = new Map()
     for (const hops of hopsArr) {
       if (Array.isArray(optsPartialReplication[hops])) {
@@ -132,8 +132,8 @@ module.exports = class RequestManager {
         templates.set(hops, null)
       }
     }
-    if (group) {
-      templates.set('group', new Template(group))
+    if (optsPartialReplication.group) {
+      templates.set('group', new Template(optsPartialReplication.group))
     }
     return templates
   }
