@@ -245,14 +245,8 @@ module.exports = class RequestManager {
    */
   _matchBranchWith(category, branch, mainFeedId = null) {
     const template = this._findTemplateForCategory(category)
-    //if (hopsOrGroup === 'group')
-    //  console.log('template for branch', template, branch)
-    if (
-      template &&
-      template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
-    )
-      return true
-    return false
+    if (!template) return
+    return template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
   }
 
   /**
