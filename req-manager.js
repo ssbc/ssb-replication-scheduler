@@ -274,36 +274,28 @@ module.exports = class RequestManager {
 
     if (this._requestedTreeFromMain.has(mainFeedId)) {
       const hops = this._requestedTreeFromMain.get(mainFeedId)
-      const matchedNode = this._matchBranchWith(hops, branch, mainFeedId)
-      if (!matchedNode) return
+      const isMatch = this._matchBranchWith(hops, branch, mainFeedId)
+      if (!isMatch) return
       this._request(leaf.id, hops)
       return
     }
 
     if (this._requestedTreeFromRoot.has(root.id)) {
-      //if (branch.length === 4) console.log('long root branch', branch)
-      const matchedNode = this._matchBranchWith('group', branch)
-      //if (branch.length === 3)
-      //  console.log('shard root branch', branch, matchedNode)
-      if (!matchedNode) return
-      //console.log('about to request branch', branch)
+      const isMatch = this._matchBranchWith('group', branch)
+      if (!isMatch) return
       this._request(leaf.id)
       return
     }
 
     // Unrequest leaf feed if feed was unrequested
     if (this._unrequested.has(feedId)) {
-      const prevHopsOrGroup = this._unrequested.get(feedId)
-      if (prevHopsOrGroup === null) {
+      const prevCategory = this._unrequested.get(feedId)
+      if (prevCategory === null) {
         this._unrequest(leaf.id)
         return
       }
-      const matchedNode = this._matchBranchWith(
-        prevHopsOrGroup,
-        branch,
-        mainFeedId
-      )
-      if (!matchedNode) return
+      const isMatch = this._matchBranchWith(prevCategory, branch, mainFeedId)
+      if (!isMatch) return
       this._unrequest(leaf.id)
       return
     }
@@ -315,8 +307,8 @@ module.exports = class RequestManager {
         this._block(leaf.id)
         return
       }
-      const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
-      if (!matchedNode) return
+      const isMatch = this._matchBranchWith(prevHops, branch, mainFeedId)
+      if (!isMatch) return
       this._block(leaf.id)
       return
     }
