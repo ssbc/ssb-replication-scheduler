@@ -99,7 +99,7 @@ exports.init = function (ssb, config) {
     if (started) return
     started = true
 
-    // Replicate myself ASAP, without request manager
+    // Replicate my main feed ASAP, without request manager
     ssb.ebt.request(ssb.id, true)
 
     if (ssb.db) {

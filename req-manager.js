@@ -265,14 +265,14 @@ module.exports = class RequestManager {
   }
 
   _handleBranch(branch) {
+    if (!this._isValidBranch(branch)) return
     const root = branch[0]
     const leaf = branch[branch.length - 1]
     // this might be null but that's fine
     const mainFeedId = this._metafeedFinder.getInverse(root.id)
     const feedId = mainFeedId || root.id
-    if (!this._isValidBranch(branch)) return
 
-    if (this._requestedTreeFromMain.has(mainFeedId)) {
+    if (mainFeedId && this._requestedTreeFromMain.has(mainFeedId)) {
       const hops = this._requestedTreeFromMain.get(mainFeedId)
       const isMatch = this._matchBranchWith(hops, branch, mainFeedId)
       if (!isMatch) return
