@@ -68,11 +68,8 @@ exports.init = function (ssb, config) {
   }
 
   function monitorGroupMembersStream() {
-    //TODO add live arguments to tribes2
-
     if (!ssb.tribes2) return
 
-    if (membersInterval) clearInterval(membersInterval)
     membersInterval = setInterval(() => {
       pull(
         ssb.tribes2.list(),
@@ -87,12 +84,26 @@ exports.init = function (ssb, config) {
         ),
         pull.flatten(),
         pull.drain(({ groupMemberId, groupSecret }) => {
-          //console.log(ssb.id.slice(0, 5), 'groupMemberId', member.groupMemberId)
           requestManager.addGroupMember(groupMemberId, groupSecret)
         })
       )
     }, 100)
     if (membersInterval.unref) membersInterval.unref()
+  }
+
+  function _resume() {
+    monitorGraphStream()
+    monitorHopStream()
+    monitorGroupMembersStream()
+  }
+
+  function _pause() {
+    drainGraphStream.abort()
+    drainGraphStream = null
+    drainHopStream.abort()
+    drainHopStream = null
+    clearInterval(membersInterval)
+    membersInterval = null
   }
 
   function start() {
@@ -104,21 +115,11 @@ exports.init = function (ssb, config) {
 
     if (ssb.db) {
       ssb.db.getIndexingActive()((active) => {
-        if (active > 0) {
-          drainGraphStream.abort()
-          drainGraphStream = null
-          drainHopStream.abort()
-          drainHopStream = null
-        } else {
-          monitorGraphStream()
-          monitorHopStream()
-          monitorGroupMembersStream()
-        }
+        if (active > 0) _pause()
+        else _resume()
       }, true)
     } else {
-      monitorGraphStream()
-      monitorHopStream()
-      monitorGroupMembersStream()
+      _resume()
     }
   }
 
