@@ -32,6 +32,7 @@ module.exports = class RequestManager {
     this._requestableMains = new Set() // mainFeedIds
     this._requestableRoots = new Set() // rootFeedIds
     this._requested = new Set() // feedIds
+    this._requestedInGroupBranch = new Set() // feedIds
     this._unrequested = new Set() // feedIds
     this._blocked = new Set() // feedIds
     this._tombstoned = new Set() // feedIds
@@ -227,6 +228,13 @@ module.exports = class RequestManager {
     return template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
   }
 
+  _isGroupMemberBranch(branch) {
+    const root = branch[0]
+    return (
+      this._groupMembers.has(root.id) && this._matchBranchWith('group', branch)
+    )
+  }
+
   /**
    * Validation according to metafeeds tree structure v1
    */
@@ -255,11 +263,10 @@ module.exports = class RequestManager {
       branch.map((feed) => feed.purpose).join('/')
     )
 
-    if (this._groupMembers.has(root.id)) {
-      if (this._matchBranchWith('group', branch)) {
-        this._requestBranch(branch)
-        return
-      }
+    if (this._isGroupMemberBranch(branch)) {
+      for (const feed of branch) this._requestedInGroupBranch.add(feed.id)
+      this._requestBranch(branch)
+      return
     }
 
     if (mainFeedId && hopsCase) {
@@ -270,11 +277,9 @@ module.exports = class RequestManager {
           }
           break
         case 'unrequest':
-          // FIXME: WE HAVE TO CHECK THAT NO ONE ELSE NEEDS THIS SHARD
           this._unrequestBranch(branch)
           break
         case 'block':
-          // FIXME: WE HAVE TO CHECK THAT NO ONE ELSE NEEDS THIS SHARD
           this._blockBranch(branch)
           break
       }
@@ -286,11 +291,19 @@ module.exports = class RequestManager {
   }
 
   _unrequestBranch(branch) {
-    for (const feed of branch) this._unrequest(feed.id)
+    for (const feed of branch) {
+      if (!this._requestedInGroupBranch.has(feed.id)) {
+        this._unrequest(feed.id)
+      }
+    }
   }
 
   _blockBranch(branch) {
-    for (const feed of branch) this._block(feed.id)
+    for (const feed of branch) {
+      if (!this._requestedInGroupBranch.has(feed.id)) {
+        this._block(feed.id)
+      }
+    }
   }
 
   _fetchAndRequestMetafeed(mainFeedId) {
@@ -363,8 +376,8 @@ module.exports = class RequestManager {
       this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
       pull.filter((branch) => this._isValidBranch(branch)),
       pull.drain((branch) => {
-        // FIXME: if this is a group branch, we need to replicate it!
-        if (hopsCase === 'block') this._blockBranch(branch)
+        if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
+        else if (hopsCase === 'block') this._blockBranch(branch)
         else if (hopsCase === 'unrequest') this._unrequestBranch(branch)
       })
     )
@@ -414,8 +427,8 @@ module.exports = class RequestManager {
           this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
           pull.filter((branch) => this._isValidBranch(branch)),
           pull.drain((branch) => {
-            // FIXME: if this is a group branch, we need to replicate it!
-            this._unrequestBranch(branch)
+            if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
+            else this._unrequestBranch(branch)
           })
         )
       }
@@ -440,8 +453,8 @@ module.exports = class RequestManager {
           this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
           pull.filter((branch) => this._isValidBranch(branch)),
           pull.drain((branch) => {
-            // FIXME: if this is a group branch, we need to replicate it!
-            this._blockBranch(branch)
+            if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
+            else this._blockBranch(branch)
           })
         )
       }

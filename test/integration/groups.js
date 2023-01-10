@@ -8,7 +8,14 @@ const SecretStack = require('secret-stack')
 const caps = require('ssb-caps')
 const ssbKeys = require('ssb-keys')
 const p = require('util').promisify
-const { where, author, count, toPromise } = require('ssb-db2/operators')
+const {
+  where,
+  author,
+  and,
+  type,
+  count,
+  toPromise,
+} = require('ssb-db2/operators')
 const u = require('../misc/util')
 
 const sleep = p(setTimeout)
@@ -36,7 +43,7 @@ const Server = (name, opts = {}) => {
     .use(require('ssb-index-feeds'))
     .use(require('../..'))({
     path,
-    keys: ssbKeys.generate(),
+    keys: ssbKeys.generate('ed25519', name),
     ...opts,
   })
 
@@ -59,8 +66,24 @@ async function waitUntilMember(person, groupId) {
   }
 }
 
-test('You replicate other people in a group', async (t) => {
+const aliceSeed = Buffer.from(
+  '000000000000000000000000000000000000000000000000000000000000a71ce',
+  'hex'
+)
+const bobSeed = Buffer.from(
+  '00000000000000000000000000000000000000000000000000000000000000b0b',
+  'hex'
+)
+const carolSeed = Buffer.from(
+  '000000000000000000000000000000000000000000000000000000000000ca507',
+  'hex'
+)
+
+test('group members who are not friends replicate each other', async (t) => {
   const alice = Server('alice', {
+    metafeeds: {
+      seed: aliceSeed,
+    },
     friends: {
       hops: 1,
     },
@@ -69,11 +92,15 @@ test('You replicate other people in a group', async (t) => {
       partialReplication: {
         0: [{}],
         1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
       },
     },
   })
 
   const bob = Server('bob', {
+    metafeeds: {
+      seed: bobSeed,
+    },
     friends: {
       hops: 1,
     },
@@ -88,6 +115,9 @@ test('You replicate other people in a group', async (t) => {
   })
 
   const carol = Server('carol', {
+    metafeeds: {
+      seed: carolSeed,
+    },
     friends: {
       hops: 1,
     },
@@ -96,6 +126,7 @@ test('You replicate other people in a group', async (t) => {
       partialReplication: {
         0: [{}],
         1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
       },
     },
   })
@@ -124,32 +155,56 @@ test('You replicate other people in a group', async (t) => {
   await sleep(REPLICATION_TIMEOUT)
 
   t.equals(
-    await alice.db.query(where(author(bob.id)), count(), toPromise()),
-    1 + 2 + 1, // 1 follow + duplicate metafeed/announce + metafeed/seed
+    await alice.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
     'alice has replicated bob main'
   )
   t.equals(
-    await alice.db.query(where(author(carol.id)), count(), toPromise()),
-    1 + 2 + 1, // 1 follow + duplicate metafeed/announce + metafeed/seed
+    await alice.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
     'alice has replicated carol main'
   )
   t.equals(
-    await bob.db.query(where(author(alice.id)), count(), toPromise()),
-    2 + 2 + 1, // 2 follows + duplicate metafeed/announce + metafeed/seed
+    await bob.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
     'bob has replicated alice main'
   )
   t.equals(
-    await carol.db.query(where(author(alice.id)), count(), toPromise()),
-    2 + 2 + 1, // 2 follows + duplicate metafeed/announce + metafeed/seed
+    await carol.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
     'carol has replicated alice main'
   )
   t.equals(
-    await bob.db.query(where(author(carol.id)), count(), toPromise()),
+    await bob.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
     0,
     'bob has NOT replicated carol main'
   )
   t.equals(
-    await carol.db.query(where(author(bob.id)), count(), toPromise()),
+    await carol.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
     0,
     'carol has NOT replicated bob main'
   )
@@ -198,6 +253,177 @@ test('You replicate other people in a group', async (t) => {
   t.equals(msg.content.text, 'hi', "bob has replicated carol's group msg")
 
   await p(connectionBC1.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+})
+
+test('group members who block each other replicate each other', async (t) => {
+  const alice = Server('alice', {
+    metafeeds: {
+      seed: aliceSeed,
+    },
+    friends: {
+      hops: 1,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
+      },
+    },
+  })
+
+  const bob = Server('bob', {
+    metafeeds: {
+      seed: bobSeed,
+    },
+    friends: {
+      hops: 1,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
+      },
+    },
+  })
+
+  const carol = Server('carol', {
+    metafeeds: {
+      seed: carolSeed,
+    },
+    friends: {
+      hops: 1,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
+      },
+    },
+  })
+
+  alice.tribes2.start()
+  bob.tribes2.start()
+  carol.tribes2.start()
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  t.pass('created root metafeeds for alice, bob, carol')
+
+  await Promise.all([
+    p(alice.db.publish)(u.follow(bob.id)),
+    p(alice.db.publish)(u.follow(carol.id)),
+    p(bob.db.publish)(u.follow(alice.id)),
+    p(carol.db.publish)(u.follow(alice.id)),
+  ])
+  t.pass('alice is mutually following bob and carol')
+
+  await p(bob.db.publish)(u.block(carol.id))
+  await p(carol.db.publish)(u.block(bob.id))
+  t.pass('bob and carol are blocking each other')
+
+  const connectionBA = await p(bob.connect)(alice.getAddress())
+  const connectionCA = await p(carol.connect)(alice.getAddress())
+  t.pass('bob and carol connected to alice')
+  await sleep(REPLICATION_TIMEOUT)
+  await sleep(REPLICATION_TIMEOUT)
+
+  t.equals(
+    await alice.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'alice has replicated bob main'
+  )
+  t.equals(
+    await alice.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'alice has replicated carol main'
+  )
+  t.equals(
+    await bob.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'bob has replicated alice main'
+  )
+  t.equals(
+    await carol.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'carol has replicated alice main'
+  )
+  t.equals(
+    await bob.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    0,
+    'bob has NOT replicated carol main'
+  )
+  t.equals(
+    await carol.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    0,
+    'carol has NOT replicated bob main'
+  )
+
+  const group = await alice.tribes2.create()
+  t.pass('alice created a group')
+
+  await alice.tribes2
+    .addMembers(group.id, [bobRoot.id, carolRoot.id])
+    .catch((err) => {
+      console.error('cant add members', err)
+      t.fail(err)
+    })
+  t.pass('alice added bob and carol to the group')
+
+  await waitUntilMember(bob, group.id).catch(t.error)
+  await waitUntilMember(carol, group.id).catch(t.error)
+  t.pass('bob and carol are members of the group')
+
+  const carolHi = await carol.tribes2
+    .publish({ type: 'post', text: 'hi', recps: [group.id] })
+    .catch((err) => {
+      console.error('publish failed:', err)
+      t.fail(err)
+    })
+  t.pass('carol published a message to the group')
+
+  await sleep(REPLICATION_TIMEOUT)
+
+  const msg = await p(bob.db.get)(carolHi.key).catch(t.error)
+  t.equals(msg.content.text, 'hi', "bob has replicated carol's group msg")
+
+  await p(connectionBA.close)(true)
+  await p(connectionCA.close)(true)
   await Promise.all([
     p(alice.close)(true),
     p(bob.close)(true),
