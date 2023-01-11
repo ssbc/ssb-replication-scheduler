@@ -184,10 +184,13 @@ variables are always prefixed with **`$`**.
 - Special values
   - `$main`
   - `$root`
+  - `$groupSecret` (only in `purpose` field)
 
 If the value of a field, e.g. in ssb-ql-0 queries, are the special strings
 `"$main"` or `"$root"`, then they respectively refer to the IDs of the _main
-feed_ and of the _root meta feed_.
+feed_ and of the _root meta feed_. The shape `{purpose: '$groupSecret'}`
+corresponds to any leaf feed where the `purpose` matches one of the group
+secrets known by the local peer.
 
 #### Example
 
