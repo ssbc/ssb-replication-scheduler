@@ -430,3 +430,198 @@ test('group members who block each other replicate each other', async (t) => {
     p(carol.close)(true),
   ])
 })
+
+test('group members replicate each other eventually', async (t) => {
+  const alice = Server('alice', {
+    metafeeds: {
+      seed: aliceSeed,
+    },
+    friends: {
+      hops: 2,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{}],
+        group: [{}],
+      },
+    },
+  })
+
+  const bob = Server('bob', {
+    metafeeds: {
+      seed: bobSeed,
+    },
+    friends: {
+      hops: 2,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{}],
+        group: [{}],
+      },
+    },
+  })
+
+  const carol = Server('carol', {
+    metafeeds: {
+      seed: carolSeed,
+    },
+    friends: {
+      hops: 2,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{}],
+        group: [{}],
+      },
+    },
+  })
+
+  alice.tribes2.start()
+  bob.tribes2.start()
+  carol.tribes2.start()
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  t.pass('created root metafeeds for alice, bob, carol')
+
+  await Promise.all([
+    p(alice.db.publish)(u.follow(bob.id)),
+    p(alice.db.publish)(u.follow(carol.id)),
+    p(bob.db.publish)(u.follow(alice.id)),
+    p(carol.db.publish)(u.follow(alice.id)),
+  ])
+  t.pass('alice is mutually following bob and carol')
+
+  const connectionBA = await p(bob.connect)(alice.getAddress())
+  const connectionCA = await p(carol.connect)(alice.getAddress())
+  t.pass('bob and carol connected to alice')
+  await sleep(REPLICATION_TIMEOUT)
+  await sleep(REPLICATION_TIMEOUT)
+
+  t.equals(
+    await alice.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'alice has replicated bob main'
+  )
+  t.equals(
+    await alice.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'alice has replicated carol main'
+  )
+  t.equals(
+    await bob.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'bob has replicated alice main'
+  )
+  t.equals(
+    await carol.db.query(
+      where(and(author(alice.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    2,
+    'carol has replicated alice main'
+  )
+  t.equals(
+    await bob.db.query(
+      where(and(author(carol.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'bob has replicated carol main'
+  )
+  t.equals(
+    await carol.db.query(
+      where(and(author(bob.id), type('contact'))),
+      count(),
+      toPromise()
+    ),
+    1,
+    'carol has replicated bob main'
+  )
+
+  const group = await alice.tribes2.create()
+  t.pass('alice created a group')
+
+  await alice.tribes2.addMembers(group.id, [bobRoot.id]).catch((err) => {
+    console.error('cant add members', err)
+    t.fail(err)
+  })
+  t.pass('alice added bob to the group')
+
+  const additionMsgs = await alice.db.query(
+    where(type('group/add-member')),
+    toPromise()
+  )
+  t.equal(additionMsgs.length, 2, 'alice published 2 group/add-member msgs')
+
+  await waitUntilMember(bob, group.id).catch(t.error)
+  t.pass('bob is a member of the group')
+
+  const bobHi = await bob.tribes2
+    .publish({ type: 'post', text: 'hi', recps: [group.id] })
+    .catch((err) => {
+      console.error('publish failed:', err)
+      t.fail(err)
+    })
+  t.pass('bob published a message to the group')
+
+  await sleep(REPLICATION_TIMEOUT)
+
+  const msgAtA = await p(alice.db.get)(bobHi.key).catch(t.error)
+  t.equals(msgAtA.content.text, 'hi', "alice has replicated bob's group msg")
+
+  const addAtC1 = await p(carol.db.get)(additionMsgs[0].key).catch(t.error)
+  t.equals(
+    typeof addAtC1.content,
+    'string',
+    "carol has replicated alice's encrypted addition msg 1"
+  )
+  const addAtC2 = await p(carol.db.get)(additionMsgs[1].key).catch(t.error)
+  t.equals(
+    typeof addAtC2.content,
+    'string',
+    "carol has replicated alice's encrypted addition msg 2"
+  )
+
+  await alice.tribes2.addMembers(group.id, [carolRoot.id]).catch((err) => {
+    console.error('cant add members', err)
+    t.fail(err)
+  })
+  t.pass('alice added carol to the group')
+
+  await waitUntilMember(carol, group.id).catch(t.error)
+  t.pass('carol is a member of the group')
+
+  const msgAtC = await p(alice.db.get)(bobHi.key).catch(t.error)
+  t.equals(msgAtC.content.text, 'hi', "carol has replicated bob's group msg")
+
+  await p(connectionBA.close)(true)
+  await p(connectionCA.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+})
