@@ -418,21 +418,6 @@ module.exports = class RequestManager {
     this._unrequested.add(feedId)
     this._ssb.ebt.request(feedId, false)
     this._ssb.ebt.block(this._ssb.id, feedId, false)
-
-    if (this._templates) {
-      // Weave through all of the subfeeds and unrequest them too
-      const root = this._metafeedFinder.get(feedId)
-      if (root) {
-        pull(
-          this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
-          pull.filter((branch) => this._isValidBranch(branch)),
-          pull.drain((branch) => {
-            if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
-            else this._unrequestBranch(branch)
-          })
-        )
-      }
-    }
   }
 
   _block(feedId) {
@@ -444,21 +429,6 @@ module.exports = class RequestManager {
     this._blocked.add(feedId)
     this._ssb.ebt.request(feedId, false)
     this._ssb.ebt.block(this._ssb.id, feedId, true)
-
-    if (this._templates) {
-      // Weave through all of the subfeeds and block them too
-      const root = this._metafeedFinder.get(feedId)
-      if (root) {
-        pull(
-          this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
-          pull.filter((branch) => this._isValidBranch(branch)),
-          pull.drain((branch) => {
-            if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
-            else this._blockBranch(branch)
-          })
-        )
-      }
-    }
   }
 
   _tombstone(feedId, shouldWeave = false) {
@@ -529,9 +499,10 @@ module.exports = class RequestManager {
     const mainFlushables = pull(
       pull.values([...this._requestableMains.values()]),
       pull.asyncMap((mainFeedId, cb) => {
+        if (!this._templates) return cb(null, [mainFeedId, false])
         const hops = this._hopsCache.get(mainFeedId)
         const template = this._findTemplateForCategory(hops)
-        if (!template) return cb(null, [mainFeedId, false])
+        if (!template && hops >= 0) return cb(null, [mainFeedId, false])
 
         this._supportsMetafeedTree(mainFeedId, (err, supports) => {
           if (err) cb(err)
