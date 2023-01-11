@@ -9,6 +9,24 @@ const detectSsbNetworkErrorSeverity = require('ssb-network-errors')
 const { where, type, live, toPullStream } = require('ssb-db2/operators')
 const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 
+class ReadyGate {
+  constructor() {
+    this.waiting = new Set()
+    this.ready = false
+  }
+
+  onReady(cb) {
+    if (this.ready) cb()
+    else this.waiting.add(cb)
+  }
+
+  setReady() {
+    this.ready = true
+    for (const cb of this.waiting) cb()
+    this.waiting.clear()
+  }
+}
+
 module.exports = class MetafeedFinder {
   constructor(ssb, opts, batchLimit = 8, period = 500) {
     this._ssb = ssb
@@ -23,6 +41,7 @@ module.exports = class MetafeedFinder {
     this._latestRequestTime = 0
     this._timer = null
     this._liveStream = pushable()
+    this._onLoaded = new ReadyGate()
 
     // If at least one hops template is configured, then load
     if (
@@ -40,23 +59,25 @@ module.exports = class MetafeedFinder {
   }
 
   fetch(mainFeedId, cb) {
-    if (this._map.has(mainFeedId)) {
-      const metaFeedId = this._map.get(mainFeedId)
-      cb(null, metaFeedId)
-    } else if (mainFeedId === this._ssb.id) {
-      this._ssb.metafeeds.findOrCreate((err, rootMF) => {
-        if (err) cb(err)
-        else if (!rootMF) cb(null, null)
-        else {
-          const metaFeedId = rootMF.id
-          this._map.set(mainFeedId, metaFeedId)
-          this._inverseMap.set(metaFeedId, mainFeedId)
-          cb(null, metaFeedId)
-        }
-      })
-    } else {
-      this._request(mainFeedId, cb)
-    }
+    this._onLoaded.onReady(() => {
+      if (this._map.has(mainFeedId)) {
+        const metaFeedId = this._map.get(mainFeedId)
+        cb(null, metaFeedId)
+      } else if (mainFeedId === this._ssb.id) {
+        this._ssb.metafeeds.findOrCreate((err, rootMF) => {
+          if (err) cb(err)
+          else if (!rootMF) cb(null, null)
+          else {
+            const metaFeedId = rootMF.id
+            this._map.set(mainFeedId, metaFeedId)
+            this._inverseMap.set(metaFeedId, mainFeedId)
+            cb(null, metaFeedId)
+          }
+        })
+      } else {
+        this._request(mainFeedId, cb)
+      }
+    })
   }
 
   get(mainFeedId) {
@@ -85,6 +106,7 @@ module.exports = class MetafeedFinder {
             this._myDebugId,
             this._map.size
           )
+          this._onLoaded.setReady()
           this._startLiveStream()
         }
       )
