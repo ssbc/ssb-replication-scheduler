@@ -56,6 +56,7 @@ const bobMFSeed = Buffer.from(
 
 let alice
 let bob
+let carol
 let david
 
 tape('setup', async (t) => {

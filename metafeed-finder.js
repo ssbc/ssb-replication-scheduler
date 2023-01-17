@@ -12,6 +12,7 @@ const { validateMetafeedAnnounce } = require('ssb-meta-feeds/validate')
 module.exports = class MetafeedFinder {
   constructor(ssb, opts, batchLimit = 8, period = 500) {
     this._ssb = ssb
+    this._myDebugId = ssb.id.substring(0, 5)
     this._opts = opts
     this._period = period
     this._batchLimit = batchLimit
@@ -80,7 +81,8 @@ module.exports = class MetafeedFinder {
         },
         () => {
           debug(
-            'loaded Map of all known main=>rootMF from disk, total %d',
+            '%s loaded Map of all known main=>rootMF from disk, total %d',
+            this._myDebugId,
             this._map.size
           )
           this._startLiveStream()
@@ -163,7 +165,8 @@ module.exports = class MetafeedFinder {
     this._ssb.db.addOOO(msgVal, (err) => {
       if (err) {
         debug(
-          'failed to addOOO for a metafeed/announce: %s',
+          '%s failed to addOOO for a metafeed/announce: %s',
+          this._myDebugId,
           err.message || err
         )
       }
@@ -223,7 +226,11 @@ module.exports = class MetafeedFinder {
     this._requestsByMainfeedId.clear()
 
     await this._forEachNeighborPeer((rpc, goToNextNeighbor) => {
-      debug('"getSubset" for peer %s for metafeed/announce messages', rpc.id)
+      debug(
+        '%s "getSubset" for peer %s for metafeed/announce messages',
+        this._myDebugId,
+        rpc.id
+      )
       pull(
         rpc.getSubset(this._makeQL1(requests), { querylang: 'ssb-ql-1' }),
         pull.filter((value) => this._validateMetafeedAnnounce({ value })),
@@ -248,7 +255,8 @@ module.exports = class MetafeedFinder {
           (err) => {
             if (err && detectSsbNetworkErrorSeverity(err) >= 2) {
               debug(
-                'failed "getSubset" muxrpc at peer %s because: %s',
+                '%s failed "getSubset" muxrpc with peer %s because: %s',
+                this._myDebugId,
                 rpc.id,
                 err.message || err
               )
@@ -272,7 +280,11 @@ module.exports = class MetafeedFinder {
   }
 
   _retryWithPeer(rpc) {
-    debug('"getSubset" retry on peer %s for metafeed/announce messages', rpc.id)
+    debug(
+      '%s "getSubset" retry on peer %s for metafeed/announce messages',
+      this._myDebugId,
+      rpc.id
+    )
     pull(
       rpc.getSubset(this._makeQL1(this._retryables), { querylang: 'ssb-ql-1' }),
       pull.filter((value) => this._validateMetafeedAnnounce({ value })),
@@ -285,7 +297,8 @@ module.exports = class MetafeedFinder {
         (err) => {
           if (err && detectSsbNetworkErrorSeverity(err) >= 2) {
             debug(
-              'failed "getSubset" muxrpc retry at peer %s because: %s',
+              '%s failed "getSubset" muxrpc retry with peer %s because: %s',
+              this._myDebugId,
               rpc.id,
               err.message || err
             )

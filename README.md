@@ -6,16 +6,16 @@ SPDX-License-Identifier: CC0-1.0
 
 # ssb-replication-scheduler
 
-_Triggers replication of feeds identified as friendly in the social graph._
+_Triggers replication of feeds identified as friendly in the social graph or in private groups._
 
-Depends on ssb-friends APIs, and calls ssb-ebt APIs.
+Depends on ssb-friends and ssb-tribes2, and calls ssb-ebt APIs.
 
 ## Installation
 
 **Prerequisites:**
 
-- Requires **Node.js 10** or higher
-- Requires **ssb-db** or **ssb-db2**
+- Requires **Node.js 12** or higher
+- Requires **ssb-db2** (it *may* work with **ssb-db** if you don't use partial replication)
 - Requires [**ssb-friends**](https://github.com/ssbc/ssb-friends) version **5.0** or higher
 - Requires [**ssb-ebt**](https://github.com/ssbc/ssb-ebt) version **9.0** or higher
 
@@ -111,6 +111,7 @@ replicationScheduler: {
     0: TEMPLATE_FOR_HOPS_0,
     1: TEMPLATE_FOR_HOPS_1,
     2: TEMPLATE_FOR_HOPS_2_AND_ABOVE,
+    group: TEMPLATE_FOR_GROUP_MEMBERS,
   }
 }
 ```
@@ -183,10 +184,13 @@ variables are always prefixed with **`$`**.
 - Special values
   - `$main`
   - `$root`
+  - `$groupSecret` (only in `purpose` field)
 
 If the value of a field, e.g. in ssb-ql-0 queries, are the special strings
 `"$main"` or `"$root"`, then they respectively refer to the IDs of the _main
-feed_ and of the _root meta feed_.
+feed_ and of the _root meta feed_. The shape `{purpose: '$groupSecret'}`
+corresponds to any leaf feed where the `purpose` matches one of the group
+secrets known by the local peer.
 
 #### Example
 

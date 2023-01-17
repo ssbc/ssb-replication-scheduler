@@ -32,6 +32,7 @@ exports.init = function (ssb, config) {
   let started = false
   let drainGraphStream = null
   let drainHopStream = null
+  let membersInterval = null
 
   if (opts.autostart === true || typeof opts.autostart === 'undefined') {
     start()
@@ -66,28 +67,59 @@ exports.init = function (ssb, config) {
     )
   }
 
+  function monitorGroupMembersStream() {
+    if (!ssb.tribes2) return
+
+    membersInterval = setInterval(() => {
+      pull(
+        ssb.tribes2.list(),
+        pull.map((group) =>
+          pull(
+            ssb.tribes2.listMembers(group.id),
+            pull.map((groupMemberId) => ({
+              groupSecret: group.secret,
+              groupMemberId,
+            }))
+          )
+        ),
+        pull.flatten(),
+        pull.drain(({ groupMemberId, groupSecret }) => {
+          requestManager.addGroupMember(groupMemberId, groupSecret)
+        })
+      )
+    }, 100)
+    if (membersInterval.unref) membersInterval.unref()
+  }
+
+  function _resume() {
+    monitorGraphStream()
+    monitorHopStream()
+    monitorGroupMembersStream()
+  }
+
+  function _pause() {
+    drainGraphStream.abort()
+    drainGraphStream = null
+    drainHopStream.abort()
+    drainHopStream = null
+    clearInterval(membersInterval)
+    membersInterval = null
+  }
+
   function start() {
     if (started) return
     started = true
 
-    // Replicate myself ASAP, without request manager
+    // Replicate my main feed ASAP, without request manager
     ssb.ebt.request(ssb.id, true)
 
     if (ssb.db) {
       ssb.db.getIndexingActive()((active) => {
-        if (active > 0) {
-          drainGraphStream.abort()
-          drainGraphStream = null
-          drainHopStream.abort()
-          drainHopStream = null
-        } else {
-          monitorGraphStream()
-          monitorHopStream()
-        }
+        if (active > 0) _pause()
+        else _resume()
       }, true)
     } else {
-      monitorGraphStream()
-      monitorHopStream()
+      _resume()
     }
   }
 

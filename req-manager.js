@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const pull = require('pull-stream')
+const cat = require('pull-cat')
 const debug = require('debug')('ssb:replication-scheduler')
 const bendyButtEBTFormat = require('ssb-ebt/formats/bendy-butt')
 const indexedEBTFormat = require('ssb-ebt/formats/indexed')
@@ -15,17 +16,25 @@ const BATCH_LIMIT = 8
 module.exports = class RequestManager {
   constructor(ssb, opts) {
     this._ssb = ssb
+    this._myDebugId = ssb.id.substring(0, 5)
     this._opts = opts
     this._metafeedFinder = new MetafeedFinder(ssb, opts, BATCH_LIMIT)
     this._period =
+      // debouncePeriod basically controls how often will we trigger
+      // ssb.ebt.request() calls. We trigger those when the
+      // requestManager.add() has "calmed down", i.e. after debouncePeriod
+      // milliseconds have passed in which add() was not called.
       typeof opts.debouncePeriod === 'number'
         ? opts.debouncePeriod
         : DEFAULT_PERIOD
-    this._requestables = new Map() // feedId => hops
-    this._requested = new Map() // feedId => hops
-    this._requestedPartially = new Map() // mainFeedId => hops
-    this._unrequested = new Map() // feedId => hops when it used to be requested
-    this._blocked = new Map() // feedId => hops before it was blocked
+    this._hopsCache = new Map() // mainFeedId => hops
+    this._groupMembers = new Set() // rootFeedIds
+    this._requestableMains = new Set() // mainFeedIds
+    this._requestableRoots = new Set() // rootFeedIds
+    this._requested = new Set() // feedIds
+    this._requestedInGroupBranch = new Set() // feedIds
+    this._unrequested = new Set() // feedIds
+    this._blocked = new Set() // feedIds
     this._tombstoned = new Set() // feedIds
     this._flushing = false
     this._wantsMoreFlushing = false
@@ -37,6 +46,7 @@ module.exports = class RequestManager {
     this._liveFinderDrainer = null
     this._hasCloseHook = false
     this._templates = this._setupTemplates(this._opts.partialReplication)
+    this._myGroupSecrets = new Set() // base64 encoded
 
     // If at least one hops template is configured, then setup ssb-ebt
     if (this._templates) {
@@ -48,22 +58,21 @@ module.exports = class RequestManager {
   }
 
   add(mainFeedId, hops) {
-    if (hops === -1) return this._block(mainFeedId)
-    if (hops < -1) return this._unrequest(mainFeedId)
+    this._hopsCache.set(mainFeedId, hops)
 
-    const sameHops = hops === this._getCurrentHops(mainFeedId)
-    if (sameHops && this._requestables.has(mainFeedId)) return
-    if (sameHops && this._requested.has(mainFeedId)) return
-    if (sameHops && this._requestedPartially.has(mainFeedId)) return
+    if (!this._requestableMains.has(mainFeedId)) {
+      this._requestableMains.add(mainFeedId)
+      this._latestAdd = Date.now()
+      this._scheduleDebouncedFlush()
+    }
+  }
 
-    if (!sameHops) {
-      this._requestables.delete(mainFeedId)
-      this._requested.delete(mainFeedId)
-      this._requestedPartially.delete(mainFeedId)
-      this._unrequested.delete(mainFeedId)
-      this._blocked.delete(mainFeedId)
+  addGroupMember(rootFeedId, groupSecret) {
+    this._myGroupSecrets.add(groupSecret.toString('base64'))
+    this._groupMembers.add(rootFeedId)
 
-      this._requestables.set(mainFeedId, hops)
+    if (!this._requestableRoots.has(rootFeedId)) {
+      this._requestableRoots.add(rootFeedId)
       this._latestAdd = Date.now()
       this._scheduleDebouncedFlush()
     }
@@ -76,13 +85,10 @@ module.exports = class RequestManager {
         ? opts.debouncePeriod
         : this._period
     this._templates = this._setupTemplates(this._opts.partialReplication)
-    for (const [feedId, hops] of this._requested) {
-      this._requestables.set(feedId, hops)
+    for (const feedId of this._requested) {
       this._requested.delete(feedId)
-    }
-    for (const [mainFeedId, hops] of this._requestedPartially) {
-      this._requestables.set(mainFeedId, hops)
-      this._requestedPartially.delete(mainFeedId)
+      if (this._hopsCache.has(feedId)) this._requestableMains.add(feedId)
+      if (this._groupMembers.has(feedId)) this._requestableRoots.add(feedId)
     }
     // Refresh only the old branches stream drainer, not the live streams
     if (this._oldBranchDrainer) this._oldBranchDrainer.abort()
@@ -104,6 +110,9 @@ module.exports = class RequestManager {
         templates.set(hops, null)
       }
     }
+    if (optsPartialReplication.group) {
+      templates.set('group', new Template(optsPartialReplication.group))
+    }
     return templates
   }
 
@@ -112,9 +121,24 @@ module.exports = class RequestManager {
     return [...this._templates.values()].filter((t) => !!t).some(fn)
   }
 
-  _findTemplateForHops(hops) {
+  _interpretHops(hops) {
+    if (hops === -1) return 'block'
+    else if (hops < -1) return 'unrequest'
+    else if (hops >= 0) return 'request'
+    else return null
+  }
+
+  /**
+   * @param {number | "group"} category hops or groups
+   */
+  _findTemplateForCategory(category) {
+    if (category == null) return null
     if (!this._templates) return null
-    const templateKeys = [...this._templates.keys()]
+    if (category === 'group') return this._templates.get('group')
+    const hops = category
+    const templateKeys = [...this._templates.keys()].filter(
+      (key) => typeof key === 'number'
+    )
     const eligibleHopsArr = templateKeys.filter((h) => h >= hops)
     const pickedHops =
       eligibleHopsArr.length > 0
@@ -135,17 +159,6 @@ module.exports = class RequestManager {
     })
   }
 
-  _getCurrentHops(feedId) {
-    let h
-    h = this._requestables.get(feedId)
-    if (typeof h === 'number') return h
-    h = this._requested.get(feedId)
-    if (typeof h === 'number') return h
-    h = this._requestedPartially.get(feedId)
-    if (typeof h === 'number') return h
-    return null
-  }
-
   _setupStreamDrainers() {
     if (!this._hasCloseHook) this._setupCloseHook()
 
@@ -153,6 +166,7 @@ module.exports = class RequestManager {
       const opts = { tombstoned: false, old: true, live: false }
       pull(
         this._ssb.metafeeds.branchStream(opts),
+        pull.filter((branch) => this._isValidBranch(branch)),
         (this._oldBranchDrainer = pull.drain((branch) => {
           this._handleBranch(branch)
         }))
@@ -163,6 +177,7 @@ module.exports = class RequestManager {
       const opts = { tombstoned: false, old: false, live: true }
       pull(
         this._ssb.metafeeds.branchStream(opts),
+        pull.filter((branch) => this._isValidBranch(branch)),
         (this._liveBranchDrainer = pull.drain((branch) => {
           this._handleBranch(branch)
         }))
@@ -173,6 +188,7 @@ module.exports = class RequestManager {
       const opts = { tombstoned: true, old: true, live: true }
       pull(
         this._ssb.metafeeds.branchStream(opts),
+        pull.filter((branch) => this._isValidBranch(branch)),
         (this._tombstonedBranchDrainer = pull.drain((branch) => {
           const leaf = branch[branch.length - 1]
           this._tombstone(leaf.id, true)
@@ -188,26 +204,35 @@ module.exports = class RequestManager {
         (this._liveFinderDrainer = pull.drain(([mainFeedId, metaFeedId]) => {
           if (
             this._requested.has(mainFeedId) &&
-            !this._requestedPartially.has(metaFeedId)
+            !this._requested.has(metaFeedId)
           ) {
             debug(
-              'switch from full replication to partial replication for %s',
+              '%s switch from full replication to partial replication for %s',
+              this._myDebugId,
               mainFeedId
             )
-            const hops = this._requested.get(mainFeedId)
             this._unrequest(mainFeedId)
-            this._requestables.set(mainFeedId, hops)
-            this._requestPartially(mainFeedId)
+            this._requestTreeFromMain(mainFeedId)
           }
         }))
       )
     }
   }
 
-  _matchBranchWith(hops, branch, mainFeedId) {
-    const template = this._findTemplateForHops(hops)
+  /**
+   * @param {number | "group"} category hops or groups
+   */
+  _matchBranchWith(category, branch, mainFeedId = null) {
+    const template = this._findTemplateForCategory(category)
     if (!template) return
-    return template.matchBranch(branch, mainFeedId)
+    return template.matchBranch(branch, mainFeedId, this._myGroupSecrets)
+  }
+
+  _isGroupMemberBranch(branch) {
+    const root = branch[0]
+    return (
+      this._groupMembers.has(root.id) && this._matchBranchWith('group', branch)
+    )
   }
 
   /**
@@ -227,66 +252,74 @@ module.exports = class RequestManager {
 
   _handleBranch(branch) {
     const root = branch[0]
-    const leaf = branch[branch.length - 1]
     const mainFeedId = this._metafeedFinder.getInverse(root.id)
-    if (!mainFeedId) return
-    if (!this._isValidBranch(branch)) return
+    const hops = mainFeedId ? this._hopsCache.get(mainFeedId) : null
+    const hopsCase = typeof hops === 'number' ? this._interpretHops(hops) : null
+    debug(
+      '%s handle branch case=%s %s=>%s',
+      this._myDebugId,
+      hopsCase || '?',
+      mainFeedId ? mainFeedId.substring(0, 5) : '?',
+      branch.map((feed) => feed.purpose).join('/')
+    )
 
-    if (this._requestedPartially.has(mainFeedId)) {
-      const hops = this._requestedPartially.get(mainFeedId)
-      const matchedNode = this._matchBranchWith(hops, branch, mainFeedId)
-      if (!matchedNode) return
-      this._request(leaf.id, hops)
+    if (this._isGroupMemberBranch(branch)) {
+      for (const feed of branch) this._requestedInGroupBranch.add(feed.id)
+      this._requestBranch(branch)
       return
     }
 
-    // Unrequest leaf feed if main feed was unrequested
-    if (this._unrequested.has(mainFeedId)) {
-      const prevHops = this._unrequested.get(mainFeedId)
-      if (prevHops === null) {
-        this._unrequest(leaf.id)
-        return
+    if (mainFeedId && hopsCase) {
+      switch (hopsCase) {
+        case 'request':
+          if (this._matchBranchWith(hops, branch, mainFeedId)) {
+            this._requestBranch(branch)
+          }
+          break
+        case 'unrequest':
+          this._unrequestBranch(branch)
+          break
+        case 'block':
+          this._blockBranch(branch)
+          break
       }
-      const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
-      if (!matchedNode) return
-      this._unrequest(leaf.id)
-      return
-    }
-
-    // Block leaf feed if main feed was blocked
-    if (this._blocked.has(mainFeedId)) {
-      const prevHops = this._blocked.get(mainFeedId)
-      if (prevHops === null) {
-        this._block(leaf.id)
-        return
-      }
-      const matchedNode = this._matchBranchWith(prevHops, branch, mainFeedId)
-      if (!matchedNode) return
-      this._block(leaf.id)
-      return
     }
   }
 
-  _fetchAndRequestMetafeed(mainFeedId, hops) {
+  _requestBranch(branch) {
+    for (const feed of branch) this._request(feed.id)
+  }
+
+  _unrequestBranch(branch) {
+    for (const feed of branch) {
+      if (!this._requestedInGroupBranch.has(feed.id)) {
+        this._unrequest(feed.id)
+      }
+    }
+  }
+
+  _blockBranch(branch) {
+    for (const feed of branch) {
+      if (!this._requestedInGroupBranch.has(feed.id)) {
+        this._block(feed.id)
+      }
+    }
+  }
+
+  _fetchAndRequestMetafeed(mainFeedId) {
     this._metafeedFinder.fetch(mainFeedId, (err, metafeedId) => {
       if (err) {
         console.error(err)
       } else if (!metafeedId) {
         console.error('cannot partially replicate ' + mainFeedId)
       } else {
-        this._request(metafeedId, hops)
+        this._request(metafeedId)
       }
     })
   }
 
-  _requestPartially(mainFeedId) {
-    if (this._requestedPartially.has(mainFeedId)) return
-    if (!this._requestables.has(mainFeedId)) return
-    debug('will process %s for partial replication', mainFeedId)
-
-    const hops = this._getCurrentHops(mainFeedId)
-    this._requestedPartially.set(mainFeedId, hops)
-    this._requestables.delete(mainFeedId)
+  _requestTreeFromMain(mainFeedId) {
+    debug('%s will process metafeed tree for %s', this._myDebugId, mainFeedId)
 
     // We may already have the meta feed, so continue replicating
     const root = this._metafeedFinder.get(mainFeedId)
@@ -295,6 +328,7 @@ module.exports = class RequestManager {
       const opts = { root, tombstoned: false, old: true, live: false }
       pull(
         this._ssb.metafeeds.branchStream(opts),
+        pull.filter((branch) => this._isValidBranch(branch)),
         pull.drain(
           (branch) => {
             branchesFound = true
@@ -302,7 +336,7 @@ module.exports = class RequestManager {
           },
           () => {
             if (branchesFound === false) {
-              this._fetchAndRequestMetafeed(mainFeedId, hops)
+              this._fetchAndRequestMetafeed(mainFeedId)
             }
           }
         )
@@ -310,78 +344,98 @@ module.exports = class RequestManager {
     }
     // Fetch metafeedId for this (main) feedId for the first time
     else {
-      this._fetchAndRequestMetafeed(mainFeedId, hops)
+      this._fetchAndRequestMetafeed(mainFeedId)
     }
   }
 
-  _request(feedId, hops = null) {
-    if (this._requested.has(feedId)) return
-    debug('will replicate %s', feedId)
+  _requestTreeFromRoot(rootFeedId) {
+    debug('%s will process metafeed tree under %s', this._myDebugId, rootFeedId)
 
-    if (this._requestables.has(feedId)) {
-      hops = this._requestables.get(feedId)
-      this._requestables.delete(feedId)
+    this._request(rootFeedId)
+    const opts = { root: rootFeedId, tombstoned: false, old: true, live: false }
+    pull(
+      this._ssb.metafeeds.branchStream(opts),
+      pull.filter((branch) => this._isValidBranch(branch)),
+      pull.drain((branch) => {
+        this._handleBranch(branch)
+      })
+    )
+  }
+
+  _processTreeByHops(mainFeedId) {
+    const hops = this._hopsCache.get(mainFeedId)
+    const hopsCase = this._interpretHops(hops)
+    if (hopsCase === 'request') {
+      this._requestTreeFromMain(mainFeedId)
+      return
     }
-    this._requested.set(feedId, hops)
+
+    const root = this._metafeedFinder.get(mainFeedId)
+    if (!root) return
+    pull(
+      this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
+      pull.filter((branch) => this._isValidBranch(branch)),
+      pull.drain((branch) => {
+        if (this._isGroupMemberBranch(branch)) this._requestBranch(branch)
+        else if (hopsCase === 'block') this._blockBranch(branch)
+        else if (hopsCase === 'unrequest') this._unrequestBranch(branch)
+      })
+    )
+  }
+
+  _processMainByHops(mainFeedId) {
+    const hops = this._hopsCache.get(mainFeedId)
+    switch (this._interpretHops(hops)) {
+      case 'request':
+        this._request(mainFeedId)
+        break
+      case 'unrequest':
+        this._unrequest(mainFeedId)
+        break
+      case 'block':
+        this._block(mainFeedId)
+        break
+    }
+  }
+
+  _request(feedId) {
+    if (this._requested.has(feedId)) return
+    debug('%s will replicate %s', this._myDebugId, feedId)
+
+    this._unrequested.delete(feedId)
+    this._blocked.delete(feedId)
+    this._requested.add(feedId)
     this._ssb.ebt.block(this._ssb.id, feedId, false)
     this._ssb.ebt.request(feedId, true)
   }
 
   _unrequest(feedId) {
     if (this._unrequested.has(feedId)) return
-    debug('will stop replicating %s', feedId)
+    debug('%s will stop replicating %s', this._myDebugId, feedId)
 
-    const hops = this._getCurrentHops(feedId)
-    this._requestables.delete(feedId)
     this._requested.delete(feedId)
-    this._requestedPartially.delete(feedId)
-    this._unrequested.set(feedId, hops)
+    this._blocked.delete(feedId)
+    this._unrequested.add(feedId)
     this._ssb.ebt.request(feedId, false)
     this._ssb.ebt.block(this._ssb.id, feedId, false)
-
-    if (this._templates) {
-      // Weave through all of the subfeeds and unrequest them too
-      const root = this._metafeedFinder.get(feedId) || feedId
-      pull(
-        this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
-        pull.drain((branch) => {
-          this._handleBranch(branch)
-        })
-      )
-    }
   }
 
   _block(feedId) {
     if (this._blocked.has(feedId)) return
-    debug('will block replication of %s', feedId)
+    debug('%s will block replication of %s', this._myDebugId, feedId)
 
-    const hops = this._getCurrentHops(feedId)
-    this._requestables.delete(feedId)
     this._requested.delete(feedId)
-    this._requestedPartially.delete(feedId)
-    this._blocked.set(feedId, hops)
+    this._unrequested.delete(feedId)
+    this._blocked.add(feedId)
     this._ssb.ebt.request(feedId, false)
     this._ssb.ebt.block(this._ssb.id, feedId, true)
-
-    if (this._templates) {
-      // Weave through all of the subfeeds and block them too
-      const root = this._metafeedFinder.get(feedId) || feedId
-      pull(
-        this._ssb.metafeeds.branchStream({ root, old: true, live: false }),
-        pull.drain((branch) => {
-          this._handleBranch(branch)
-        })
-      )
-    }
   }
 
   _tombstone(feedId, shouldWeave = false) {
     if (this._tombstoned.has(feedId)) return
-    debug('will stop replicating tombstoned %s', feedId)
+    debug('%s will stop replicating tombstoned %s', this._myDebugId, feedId)
 
-    this._requestables.delete(feedId)
     this._requested.delete(feedId)
-    this._requestedPartially.delete(feedId)
     this._blocked.delete(feedId)
     this._tombstoned.add(feedId)
     this._ssb.ebt.request(feedId, false)
@@ -391,6 +445,7 @@ module.exports = class RequestManager {
       const opts = { root: feedId, tombstoned: null, old: true, live: false }
       pull(
         this._ssb.metafeeds.branchStream(opts),
+        pull.filter((branch) => this._isValidBranch(branch)),
         pull.drain((branch) => {
           const leaf = branch[branch.length - 1]
           this._tombstone(leaf.id, false)
@@ -399,7 +454,7 @@ module.exports = class RequestManager {
     }
   }
 
-  _supportsPartialReplication(mainFeedId, cb) {
+  _supportsMetafeedTree(mainFeedId, cb) {
     this._metafeedFinder.fetch(mainFeedId, (err, metafeedId) => {
       if (err) cb(err)
       else cb(null, !!metafeedId)
@@ -421,7 +476,10 @@ module.exports = class RequestManager {
     if (this._timer) return // Timer is already enabled
     this._timer = setInterval(() => {
       // Turn off the timer if there is nothing to flush
-      if (this._requestables.size === 0) {
+      if (
+        this._requestableMains.size === 0 &&
+        this._requestableRoots.size === 0
+      ) {
         clearInterval(this._timer)
         this._timer = null
       }
@@ -437,34 +495,51 @@ module.exports = class RequestManager {
 
   _flush() {
     this._flushing = true
-    pull(
-      pull.values([...this._requestables.entries()]),
-      pull.asyncMap(([feedId, hops], cb) => {
-        const template = this._findTemplateForHops(hops)
-        if (!template) return cb(null, [feedId, false])
 
-        this._supportsPartialReplication(feedId, (err, supports) => {
+    const mainFlushables = pull(
+      pull.values([...this._requestableMains.values()]),
+      pull.asyncMap((mainFeedId, cb) => {
+        if (!this._templates) return cb(null, [mainFeedId, false])
+        const hops = this._hopsCache.get(mainFeedId)
+        const template = this._findTemplateForCategory(hops)
+        if (!template && hops >= 0) return cb(null, [mainFeedId, false])
+
+        this._supportsMetafeedTree(mainFeedId, (err, supports) => {
           if (err) cb(err)
-          else cb(null, [feedId, supports])
+          else cb(null, [mainFeedId, supports])
         })
       }),
-      pull.drain(
-        ([feedId, supportsPartialReplication]) => {
-          if (supportsPartialReplication) {
-            this._requestPartially(feedId)
-          } else {
-            this._request(feedId)
-          }
-        },
-        (err) => {
-          this._flushing = false
-          if (err) console.error(err)
-          if (this._templates) this._setupStreamDrainers()
-          if (this._wantsMoreFlushing) {
-            this._scheduleDebouncedFlush()
-          }
+      pull.map(([mainFeedId, supportsMetafeedTree]) => {
+        this._requestableMains.delete(mainFeedId)
+        if (supportsMetafeedTree) {
+          this._processTreeByHops(mainFeedId)
+        } else {
+          this._processMainByHops(mainFeedId)
         }
-      )
+        return null
+      })
+    )
+
+    const rootFlushables =
+      this._templates && this._templates.has('group')
+        ? pull(
+            pull.values([...this._requestableRoots.values()]),
+            pull.map((rootFeedId) => {
+              this._requestableRoots.delete(rootFeedId)
+              this._requestTreeFromRoot(rootFeedId)
+              return null
+            })
+          )
+        : pull.empty()
+
+    pull(
+      cat([mainFlushables, rootFlushables]),
+      pull.onEnd((err) => {
+        this._flushing = false
+        if (err) console.error(err)
+        if (this._templates) this._setupStreamDrainers()
+        if (this._wantsMoreFlushing) this._scheduleDebouncedFlush()
+      })
     )
   }
 }
