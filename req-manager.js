@@ -28,7 +28,7 @@ module.exports = class RequestManager {
         ? opts.debouncePeriod
         : DEFAULT_PERIOD
     this._hopsCache = new Map() // mainFeedId => hops
-    this._groupMembers = new Set() // feedIds
+    this._groupMembers = new Set() // rootFeedIds
     this._requestableMains = new Set() // mainFeedIds
     this._requestableRoots = new Set() // rootFeedIds
     this._requested = new Set() // feedIds
