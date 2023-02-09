@@ -50,22 +50,6 @@ const Server = (name, opts = {}) => {
   return sbot
 }
 
-async function waitUntilMember(person, groupId) {
-  let isMember = false
-  for (let i = 0; !isMember && i < 50; i++) {
-    await person.tribes2
-      .get(groupId)
-      .then(() => {
-        isMember = true
-      })
-      .catch(() => {})
-    await p(setTimeout)(100)
-  }
-  if (!isMember) {
-    throw new Error('Timed out waiting for person to be member of group')
-  }
-}
-
 const aliceSeed = Buffer.from(
   '000000000000000000000000000000000000000000000000000000000000a71ce',
   'hex'
