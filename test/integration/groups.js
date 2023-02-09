@@ -417,7 +417,7 @@ test('group members who block each other replicate each other', async (t) => {
   ])
 })
 
-test.only('group members replicate each other eventually', async (t) => {
+test('group members replicate each other eventually', async (t) => {
   const alice = Server('alice', {
     metafeeds: {
       seed: aliceSeed,
