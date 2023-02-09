@@ -604,6 +604,8 @@ test('group members replicate each other eventually', async (t) => {
   await carol.tribes2.acceptInvite(group.id).catch(t.error)
   t.pass('carol is a member of the group')
 
+  await sleep(REPLICATION_TIMEOUT)
+
   const msgAtC = await p(alice.db.get)(bobHi.key).catch(t.error)
   t.equals(msgAtC.content.text, 'hi', "carol has replicated bob's group msg")
 
