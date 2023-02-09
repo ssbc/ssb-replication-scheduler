@@ -28,8 +28,8 @@
     "ssb-meta-feeds": "^0.38.2",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.1",
-    "ssb-tribes2": "^0.3.0",
-    "ssb-box2": "^4.0.0"
+    "ssb-tribes2": "^0.4.0",
+    "ssb-box2": "^5.0.0"
   },
   "devDependencies": {
     "c8": "^7.12.0",
