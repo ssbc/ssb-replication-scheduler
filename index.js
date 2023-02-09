@@ -68,7 +68,12 @@ exports.init = function (ssb, config) {
   }
 
   function monitorGroupMembersStream() {
-    if (!ssb.tribes2) return
+    if (!ssb.tribes2) {
+      groupMemberStream = {
+        abort: () => {},
+      }
+      return
+    }
 
     pull(
       ssb.tribes2.list({ live: true }),
