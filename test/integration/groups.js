@@ -50,22 +50,6 @@ const Server = (name, opts = {}) => {
   return sbot
 }
 
-async function waitUntilMember(person, groupId) {
-  let isMember = false
-  for (let i = 0; !isMember && i < 50; i++) {
-    await person.tribes2
-      .get(groupId)
-      .then(() => {
-        isMember = true
-      })
-      .catch(() => {})
-    await p(setTimeout)(100)
-  }
-  if (!isMember) {
-    throw new Error('Timed out waiting for person to be member of group')
-  }
-}
-
 const aliceSeed = Buffer.from(
   '000000000000000000000000000000000000000000000000000000000000a71ce',
   'hex'
@@ -131,9 +115,9 @@ test('group members who are not friends replicate each other', async (t) => {
     },
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
-  carol.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -228,8 +212,8 @@ test('group members who are not friends replicate each other', async (t) => {
   const connectionCA2 = await p(carol.connect)(alice.getAddress())
   t.pass('bob and carol connected to alice')
   await sleep(REPLICATION_TIMEOUT)
-  await waitUntilMember(bob, group.id).catch(t.error)
-  await waitUntilMember(carol, group.id).catch(t.error)
+  await bob.tribes2.acceptInvite(group.id).catch(t.error)
+  await carol.tribes2.acceptInvite(group.id).catch(t.error)
   t.pass('bob and carol are members of the group')
 
   await p(connectionBA2.close)(true)
@@ -312,9 +296,9 @@ test('group members who block each other replicate each other', async (t) => {
     },
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
-  carol.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -405,8 +389,10 @@ test('group members who block each other replicate each other', async (t) => {
     })
   t.pass('alice added bob and carol to the group')
 
-  await waitUntilMember(bob, group.id).catch(t.error)
-  await waitUntilMember(carol, group.id).catch(t.error)
+  await sleep(REPLICATION_TIMEOUT)
+
+  await bob.tribes2.acceptInvite(group.id).catch(t.error)
+  await carol.tribes2.acceptInvite(group.id).catch(t.error)
   t.pass('bob and carol are members of the group')
 
   const carolHi = await carol.tribes2
@@ -483,9 +469,9 @@ test('group members replicate each other eventually', async (t) => {
     },
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
-  carol.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -576,7 +562,9 @@ test('group members replicate each other eventually', async (t) => {
   )
   t.equal(additionMsgs.length, 2, 'alice published 2 group/add-member msgs')
 
-  await waitUntilMember(bob, group.id).catch(t.error)
+  await sleep(REPLICATION_TIMEOUT)
+
+  await bob.tribes2.acceptInvite(group.id).catch(t.error)
   t.pass('bob is a member of the group')
 
   const bobHi = await bob.tribes2
@@ -611,11 +599,18 @@ test('group members replicate each other eventually', async (t) => {
   })
   t.pass('alice added carol to the group')
 
-  await waitUntilMember(carol, group.id).catch(t.error)
+  await sleep(REPLICATION_TIMEOUT)
+
+  await carol.tribes2.acceptInvite(group.id).catch(t.error)
   t.pass('carol is a member of the group')
+
+  await sleep(REPLICATION_TIMEOUT)
 
   const msgAtC = await p(alice.db.get)(bobHi.key).catch(t.error)
   t.equals(msgAtC.content.text, 'hi', "carol has replicated bob's group msg")
+
+  // not sure what we're replicating at this point but it throws without this :shrug:
+  await sleep(REPLICATION_TIMEOUT)
 
   await p(connectionBA.close)(true)
   await p(connectionCA.close)(true)

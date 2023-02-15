@@ -32,7 +32,7 @@ exports.init = function (ssb, config) {
   let started = false
   let drainGraphStream = null
   let drainHopStream = null
-  let membersInterval = null
+  let groupMemberStream = null
 
   if (opts.autostart === true || typeof opts.autostart === 'undefined') {
     start()
@@ -68,27 +68,29 @@ exports.init = function (ssb, config) {
   }
 
   function monitorGroupMembersStream() {
-    if (!ssb.tribes2) return
+    if (!ssb.tribes2) {
+      groupMemberStream = {
+        abort: () => {},
+      }
+      return
+    }
 
-    membersInterval = setInterval(() => {
-      pull(
-        ssb.tribes2.list(),
-        pull.map((group) =>
-          pull(
-            ssb.tribes2.listMembers(group.id),
-            pull.map((groupMemberId) => ({
-              groupSecret: group.secret,
-              groupMemberId,
-            }))
-          )
-        ),
-        pull.flatten(),
-        pull.drain(({ groupMemberId, groupSecret }) => {
-          requestManager.addGroupMember(groupMemberId, groupSecret)
-        })
-      )
-    }, 100)
-    if (membersInterval.unref) membersInterval.unref()
+    pull(
+      ssb.tribes2.list({ live: true }),
+      pull.map((group) =>
+        pull(
+          ssb.tribes2.listMembers(group.id, { live: true }),
+          pull.map((groupMemberId) => ({
+            groupSecret: group.secret,
+            groupMemberId,
+          }))
+        )
+      ),
+      pull.flatten(),
+      (groupMemberStream = pull.drain(({ groupMemberId, groupSecret }) => {
+        requestManager.addGroupMember(groupMemberId, groupSecret)
+      }))
+    )
   }
 
   function _resume() {
@@ -102,8 +104,8 @@ exports.init = function (ssb, config) {
     drainGraphStream = null
     drainHopStream.abort()
     drainHopStream = null
-    clearInterval(membersInterval)
-    membersInterval = null
+    groupMemberStream.abort()
+    groupMemberStream = null
   }
 
   function start() {
