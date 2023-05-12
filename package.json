@@ -21,15 +21,16 @@
   "dependencies": {
     "debug": "^4.3.2",
     "pull-cat": "^1.1.11",
+    "pull-many": "^1.0.9",
     "pull-pushable": "^2.2.0",
     "pull-stream": "^3.6.0",
+    "ssb-box2": "^7.1.0",
     "ssb-db2": ">=3.0.0 <=6",
     "ssb-ebt": "^9.1.2",
-    "ssb-meta-feeds": "^0.38.2",
+    "ssb-meta-feeds": "^0.39.0",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.1",
-    "ssb-tribes2": "^0.4.0",
-    "ssb-box2": "^5.0.0"
+    "ssb-tribes2": "ssbc/ssb-tribes2#added-late"
   },
   "devDependencies": {
     "c8": "^7.12.0",
@@ -46,10 +47,10 @@
     "scuttle-testbot": "^1.11.0",
     "secret-stack": "6.4.1",
     "ssb-bendy-butt": "1.0.2",
-    "ssb-caps": "1.1.0",
-    "ssb-conn": "6.0.4",
-    "ssb-classic": "1.1.0",
     "ssb-box": "1.0.1",
+    "ssb-caps": "1.1.0",
+    "ssb-classic": "1.1.0",
+    "ssb-conn": "6.0.4",
     "ssb-db": "^20.4.0",
     "ssb-db2": "6.3.1",
     "ssb-fixtures": "3.0.4",

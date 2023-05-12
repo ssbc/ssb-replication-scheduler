@@ -4,6 +4,7 @@
 
 const pull = require('pull-stream')
 const RequestManager = require('./req-manager')
+const pullMany = require('pull-many')
 
 const DEFAULT_OPTS = {
   partialReplication: null,
@@ -76,14 +77,24 @@ exports.init = function (ssb, config) {
     }
 
     pull(
+      // we don't care about groups we've been excluded from
       ssb.tribes2.list({ live: true }),
+      pull.unique('id'),
       pull.map((group) =>
         pull(
           ssb.tribes2.listMembers(group.id, { live: true }),
-          pull.map((groupMemberId) => ({
-            groupSecret: group.secret,
-            groupMemberId,
-          }))
+          pull.map((members) => members.added),
+          pull.flatten(),
+          pull.unique(),
+          pull.map((groupMemberId) =>
+            group.readKeys
+              .map((readKey) => readKey.key)
+              .map((groupSecret) => ({
+                groupSecret,
+                groupMemberId,
+              }))
+          ),
+          pull.flatten()
         )
       ),
       pull.flatten(),
