@@ -82,7 +82,7 @@ exports.init = function (ssb, config) {
       pull.unique('id'),
       pull.map((group) =>
         pull(
-          ssb.tribes2.listMembers(group.id, { live: true }),
+          ssb.tribes2.listMembers(group.id, { allAdded: true, live: true }),
           pull.map((members) => members.added),
           pull.flatten(),
           pull.unique(),
@@ -98,9 +98,18 @@ exports.init = function (ssb, config) {
         )
       ),
       pull.flatten(),
-      (groupMemberStream = pull.drain(({ groupMemberId, groupSecret }) => {
-        requestManager.addGroupMember(groupMemberId, groupSecret)
-      }))
+      (groupMemberStream = pull.drain(
+        ({ groupMemberId, groupSecret }) => {
+          requestManager.addGroupMember(groupMemberId, groupSecret)
+        },
+        (err) => {
+          if (err)
+            throw new Error(
+              'Broke while getting group members and secrets to replicate',
+              { cause: err }
+            )
+        }
+      ))
     )
   }
 
