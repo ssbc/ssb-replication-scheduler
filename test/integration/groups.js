@@ -719,7 +719,10 @@ test('Group is still intact after excluding someone', async (t) => {
 
   const carolHi = await carol.tribes2
     .publish({ type: 'post', text: 'hi', recps: [group.id] })
-    .then(() => t.pass('carol published a message to the new epoch'))
+    .then((res) => {
+      t.pass('carol published a message to the new epoch')
+      return res
+    })
     .catch((err) => {
       console.error('publish failed:', err)
       t.fail(err)
@@ -727,9 +730,11 @@ test('Group is still intact after excluding someone', async (t) => {
 
   const connectionBA4 = await p(bob.connect)(alice.getAddress())
   const connectionCA4 = await p(carol.connect)(alice.getAddress())
+  const connectionBC = await p(bob.connect)(carol.getAddress())
   await sleep(REPLICATION_TIMEOUT)
   await p(connectionBA4.close)(true)
   await p(connectionCA4.close)(true)
+  await p(connectionBC.close)(true)
   t.pass('replicated')
 
   const msgAtAlice = await p(alice.db.get)(carolHi.key).catch(t.error)
