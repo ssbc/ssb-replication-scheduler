@@ -4,7 +4,6 @@
 
 const pull = require('pull-stream')
 const RequestManager = require('./req-manager')
-const pullMany = require('pull-many')
 
 const DEFAULT_OPTS = {
   partialReplication: null,
