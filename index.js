@@ -78,7 +78,6 @@ exports.init = function (ssb, config) {
     pull(
       // we don't care about groups we've been excluded from
       ssb.tribes2.list({ live: true }),
-      pull.unique('id'),
       pull.map((group) =>
         pull(
           ssb.tribes2.listMembers(group.id, { allAdded: true, live: true }),
