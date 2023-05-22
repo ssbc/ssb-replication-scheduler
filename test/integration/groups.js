@@ -620,3 +620,132 @@ test('group members replicate each other eventually', async (t) => {
     p(carol.close)(true),
   ])
 })
+
+test('Group is still intact after excluding someone', async (t) => {
+  const sharedConfig = {
+    friends: {
+      hops: 1,
+    },
+    replicationScheduler: {
+      debouncePeriod: 1,
+      partialReplication: {
+        0: [{}],
+        1: [{ purpose: 'main' }, { purpose: 'group/additions' }],
+        group: [{ purpose: '$groupSecret' }],
+      },
+    },
+  }
+  const alice = Server('alice', {
+    ...sharedConfig,
+    metafeeds: {
+      seed: aliceSeed,
+    },
+  })
+
+  const bob = Server('bob', {
+    ...sharedConfig,
+    metafeeds: {
+      seed: bobSeed,
+    },
+  })
+
+  const carol = Server('carol', {
+    ...sharedConfig,
+    metafeeds: {
+      seed: carolSeed,
+    },
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  t.pass('created root metafeeds for alice, bob, carol')
+
+  await Promise.all([
+    p(alice.db.publish)(u.follow(bob.id)),
+    p(alice.db.publish)(u.follow(carol.id)),
+    p(bob.db.publish)(u.follow(alice.id)),
+    p(carol.db.publish)(u.follow(alice.id)),
+  ])
+  t.pass('alice is mutually following bob and carol')
+
+  const connectionBA1 = await p(bob.connect)(alice.getAddress())
+  const connectionCA1 = await p(carol.connect)(alice.getAddress())
+  t.pass('bob and carol connected to alice')
+  await sleep(REPLICATION_TIMEOUT)
+  await sleep(REPLICATION_TIMEOUT)
+  await p(connectionBA1.close)(true)
+  await p(connectionCA1.close)(true)
+  t.pass('bob and carol disconnected from alice')
+
+  const group = await alice.tribes2.create()
+  t.pass('alice created a group')
+
+  await alice.tribes2
+    .addMembers(group.id, [bobRoot.id, carolRoot.id])
+    .catch((err) => {
+      console.error('cant add members', err)
+      t.fail(err)
+    })
+  t.pass('alice added bob and carol to the group')
+
+  const connectionBA2 = await p(bob.connect)(alice.getAddress())
+  const connectionCA2 = await p(carol.connect)(alice.getAddress())
+  t.pass('bob and carol connected to alice')
+  await sleep(REPLICATION_TIMEOUT)
+  await bob.tribes2.acceptInvite(group.id).catch(t.error)
+  await carol.tribes2.acceptInvite(group.id).catch(t.error)
+  t.pass('bob and carol accepted their invites')
+
+  await p(connectionBA2.close)(true)
+  await p(connectionCA2.close)(true)
+  t.pass('bob and carol disconnected from alice')
+
+  await alice.tribes2
+    .excludeMembers(group.id, [bobRoot.id])
+    .then(() => t.pass('alice excluded bob'))
+    .catch((err) => t.error(err))
+
+  const connectionBA3 = await p(bob.connect)(alice.getAddress())
+  const connectionCA3 = await p(carol.connect)(alice.getAddress())
+  await sleep(REPLICATION_TIMEOUT)
+  await p(connectionBA3.close)(true)
+  await p(connectionCA3.close)(true)
+  t.pass('replicated')
+
+  const carolHi = await carol.tribes2
+    .publish({ type: 'post', text: 'hi', recps: [group.id] })
+    .then(() => t.pass('carol published a message to the new epoch'))
+    .catch((err) => {
+      console.error('publish failed:', err)
+      t.fail(err)
+    })
+
+  const connectionBA4 = await p(bob.connect)(alice.getAddress())
+  const connectionCA4 = await p(carol.connect)(alice.getAddress())
+  await sleep(REPLICATION_TIMEOUT)
+  await p(connectionBA4.close)(true)
+  await p(connectionCA4.close)(true)
+  t.pass('replicated')
+
+  const msgAtAlice = await p(alice.db.get)(carolHi.key).catch(t.error)
+  t.equals(
+    msgAtAlice.content.text,
+    'hi',
+    "alice has replicated carol's group msg"
+  )
+
+  await p(bob.db.get)(carolHi.key)
+    .then(() => t.fail("Bob found the msg even though he's excluded"))
+    .catch(() => t.pass("Bob didn't find the new msg since he's excluded"))
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+})
