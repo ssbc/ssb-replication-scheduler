@@ -287,6 +287,10 @@ At any point during the execution of your program, you can reconfigure the
 replication rules using this API. The configuration object passed to this API
 has the same shape as `config.replicationScheduler` (see above) has.
 
+## Security considerations
+
+The exclusion spec [says that](https://github.com/ssbc/ssb-group-exclusion-spec/blob/118f7fb2afa677b354dc327d318e7be295432e7a/README.md?plain=1#L385) we should stop replicating new messages from an excluded member. That is not implemented so far (see also relevant [proposed updates](https://github.com/ssbc/ssb-group-exclusion-spec/pull/15) to the spec) because of a lack of time. So an excluded member could in theory keep posting to the group, even if they wouldn't be able to see things remaining members posted.
+
 ## License
 
 LGPL-3.0

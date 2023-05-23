@@ -76,20 +76,38 @@ exports.init = function (ssb, config) {
     }
 
     pull(
+      // we don't care about groups we've been excluded from
       ssb.tribes2.list({ live: true }),
       pull.map((group) =>
         pull(
-          ssb.tribes2.listMembers(group.id, { live: true }),
-          pull.map((groupMemberId) => ({
-            groupSecret: group.secret,
-            groupMemberId,
-          }))
+          ssb.tribes2.listMembers(group.id, { allAdded: true, live: true }),
+          pull.map((members) => members.added),
+          pull.flatten(),
+          pull.unique(),
+          pull.map((groupMemberId) =>
+            group.readKeys
+              .map((readKey) => readKey.key)
+              .map((groupSecret) => ({
+                groupSecret,
+                groupMemberId,
+              }))
+          ),
+          pull.flatten()
         )
       ),
       pull.flatten(),
-      (groupMemberStream = pull.drain(({ groupMemberId, groupSecret }) => {
-        requestManager.addGroupMember(groupMemberId, groupSecret)
-      }))
+      (groupMemberStream = pull.drain(
+        ({ groupMemberId, groupSecret }) => {
+          requestManager.addGroupMember(groupMemberId, groupSecret)
+        },
+        (err) => {
+          if (err)
+            throw new Error(
+              'Broke while getting group members and secrets to replicate',
+              { cause: err }
+            )
+        }
+      ))
     )
   }
 
