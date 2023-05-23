@@ -29,7 +29,7 @@
     "ssb-meta-feeds": "^0.39.0",
     "ssb-network-errors": "^1.0.1",
     "ssb-subset-ql": "^1.0.1",
-    "ssb-tribes2": "github:ssbc/ssb-tribes2#all-added-members"
+    "ssb-tribes2": "^1.2.0"
   },
   "devDependencies": {
     "c8": "^7.12.0",
