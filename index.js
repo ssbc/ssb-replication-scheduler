@@ -118,11 +118,11 @@ exports.init = function (ssb, config) {
   }
 
   function _pause() {
-    drainGraphStream.abort()
+    drainGraphStream?.abort()
     drainGraphStream = null
-    drainHopStream.abort()
+    drainHopStream?.abort()
     drainHopStream = null
-    groupMemberStream.abort()
+    groupMemberStream?.abort()
     groupMemberStream = null
   }
 
